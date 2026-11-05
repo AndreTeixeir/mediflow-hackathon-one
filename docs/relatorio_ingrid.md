@@ -73,5 +73,5 @@ Implementação do motor de orquestração autônomo com **LangGraph (`StateGrap
 - [x] Code Review e Merge do **PR #3** do André (`api/` e `armazenamento/`).
 - [x] **Merge do PR #2 (`feature/agente-deploy-ingrid`) na `main` (`d67e823`):** Grafo LangGraph, Visão Multimodal, Prompts e Deploy integrados na branch principal.
 - [x] **Integração API $\leftrightarrow$ Grafo (Item E7):** `api/triagem.py` conectado ao grafo real (`executar_triagem_mediflow` / `analisar_documento` do pacote `agente`), `.env.example` documentado com Google Gemini (`gemini-2.5-flash`) e 90/90 testes automatizados passando.
-- [ ] **Próximo Passo 1 (Interface Streamlit — PR #4):** Revisar e integrar `feature/painel-auditoria` (`interface/app.py`) na `main`.
-- [ ] **Próximo Passo 2 (Deploy Final em Nuvem OCI):** Subir a aplicação integrada na VM da OCI Always Free utilizando `deploy/setup_oci_vm.sh` e `deploy/docker-compose.yml`.
+- [x] **Code Review, Merge e Integração da Interface Streamlit (PR #4 — `interface/app.py`):** Integrada na `main` com suporte a `MEDIFLOW_API_URL` (local/Docker), upload multimodal (`PDF`/`PNG`/`JPG` em Base64) e conexão direta com a API e o Grafo LangGraph.
+- [ ] **Próximo Passo Final (Deploy em Nuvem OCI):** Subir a aplicação integrada na VM da OCI Always Free utilizando `deploy/setup_oci_vm.sh` e `deploy/docker-compose.yml`.

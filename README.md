@@ -153,7 +153,7 @@ Todas as variáveis estão comentadas no `.env.example`.
 
 Respostas de erro da triagem: `422` (`documento_id` fora do padrão `[A-Za-z0-9-]{1,64}`, ou sem `documento_texto` e sem `documento_base64`), `409` (`documento_id` já recebido) e `503` (falha ao gravar no armazenamento).
 
-Enquanto o grafo de decisão com LLM não existe, a API usa um agente simulado (`api/agente_simulado.py`): ele só reconhece o texto exato dos 3 cenários de `dados_teste/`. Qualquer outro documento é tratado como "não identificado" e vai para a revisão humana.
+A rota `POST /api/v1/triagem` aciona o Grafo de Decisão no LangGraph (`agente/grafo.py`), que realiza a leitura multimodal (texto, PDF digital/digitalizado ou imagem em Base64), classifica e extrai os dados clínicos via **Google Gemini (`gemini-2.5-flash`)** (ou via motor determinístico local de fallback quando `LLM_API_KEY` está vazio) e aplica as regras clínicas de validação e roteamento.
 
 Com a API no ar, o exemplo abaixo envia o cenário de urgência (Linux ou macOS). O `documento_id` do exemplo muda para `TESTE-001`, para você poder repetir o teste mudando o número:
 

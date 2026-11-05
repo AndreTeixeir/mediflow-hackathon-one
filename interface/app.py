@@ -6,11 +6,14 @@ Mapeamento: interface/app.py
 Execução a partir da raiz: python -m streamlit run interface/app.py
 """
 
+import base64
 import json
 import os
 import requests
 import streamlit as st
+from dotenv import load_dotenv
 
+from agente import executar_triagem_mediflow
 from contratos.modelos import (
     CanalOrigem,
     ClassificacaoDocumento,
@@ -26,6 +29,13 @@ from contratos.modelos import (
     TriagemResposta,
 )
 from regras.regras_clinicas import executar_roteamento_clinico
+
+load_dotenv()
+
+API_BASE_URL = (
+    os.getenv("MEDIFLOW_API_URL", "http://localhost:8000").strip().rstrip("/")
+    or "http://localhost:8000"
+)
 
 # Configuração visual da página
 st.set_page_config(
@@ -327,53 +337,81 @@ with tab_envio:
         canal_input = st.selectbox("Canal de Origem:", ["Pronto_Socorro", "Ambulatorio", "Internacao"], index=0 if canal_padrao == "Pronto_Socorro" else 1)
 
     texto_input = st.text_area("Texto do Documento Clínico:", value=texto_padrao, height=180)
+    arquivo_upload = st.file_uploader(
+        "Ou envie um arquivo clínico (PDF digital/digitalizado ou Imagem de receita/laudo):",
+        type=["pdf", "png", "jpg", "jpeg", "webp"],
+    )
 
     if st.button("🚀 Processar Triagem Automática", use_container_width=True):
-        if not texto_input.strip():
-            st.error("Por favor, informe o texto do documento.")
+        if not texto_input.strip() and arquivo_upload is None:
+            st.error("Por favor, informe o texto do documento ou faça upload de um arquivo.")
         else:
+            tipo_arq = "TXT"
+            doc_b64 = None
+            if arquivo_upload is not None:
+                ext = arquivo_upload.name.rsplit(".", 1)[-1].upper() if "." in arquivo_upload.name else "PDF"
+                tipo_arq = "JPG" if ext == "JPEG" else ext
+                doc_b64 = base64.b64encode(arquivo_upload.getvalue()).decode("utf-8")
+
             payload = {
                 "documento_id": doc_id_input,
-                "tipo_arquivo": "TXT",
-                "documento_texto": texto_input,
-                "canal_origem": canal_input
+                "tipo_arquivo": tipo_arq,
+                "documento_texto": texto_input if texto_input.strip() else None,
+                "documento_base64": doc_b64,
+                "canal_origem": canal_input,
             }
-            
-            # Tenta chamar a API do André em localhost:8000
+
+            # Chama a API FastAPI (respeitando MEDIFLOW_API_URL para local e Docker)
             try:
-                resp = requests.post("http://localhost:8000/api/v1/triagem", json=payload, timeout=3)
+                resp = requests.post(f"{API_BASE_URL}/api/v1/triagem", json=payload, timeout=30)
                 if resp.status_code == 200:
                     resultado = resp.json()
-                    st.success("✅ Triagem processada com sucesso via API FastAPI do André!")
+                    st.success("✅ Triagem processada com sucesso via API FastAPI + Grafo LangGraph!")
                 else:
-                    st.warning(f"API respondeu com status {resp.status_code}. Executando via motor local de regras...")
+                    st.warning(f"API respondeu com status {resp.status_code}. Executando via Grafo LangGraph local...")
                     raise requests.exceptions.RequestException()
             except requests.exceptions.RequestException:
-                # Fallback: executa as regras clínicas da Lethicia diretamente
-                from api.agente_simulado import analisar_documento
+                # Fallback local: executa o Grafo LangGraph diretamente
                 entrada_obj = DocumentoEntrada(**payload)
-                classif_sim, dados_sim = analisar_documento(entrada_obj)
-                decisao_sim = executar_roteamento_clinico(classif_sim, dados_sim, texto_input, canal_input)
-                
+                resposta_grafo = executar_triagem_mediflow(entrada_obj)
+                decisao_grafo = resposta_grafo.decisao_roteamento
+
                 bucket = "mediflow-rotina"
-                if decisao_sim.destino_principal == DestinoRoteamento.FILA_EMERGENCIA:
+                if decisao_grafo.destino_principal == DestinoRoteamento.FILA_EMERGENCIA:
                     bucket = "mediflow-urgentes"
-                elif decisao_sim.destino_principal == DestinoRoteamento.FILA_REVISAO_HUMANA:
+                elif decisao_grafo.destino_principal == DestinoRoteamento.FILA_REVISAO_HUMANA:
                     bucket = "mediflow-auditoria-humana"
 
                 resultado = {
-                    "status": "pendente_auditoria" if decisao_sim.requer_auditoria_humana else "processado",
+                    "status": resposta_grafo.status.value,
                     "documento_id": doc_id_input,
-                    "classificacao": classif_sim.model_dump(),
-                    "dados_extraidos": dados_sim.model_dump(),
-                    "decisao_roteamento": decisao_sim.model_dump(),
+                    "classificacao": resposta_grafo.classificacao.model_dump(mode="json"),
+                    "dados_extraidos": resposta_grafo.dados_extraidos.model_dump(mode="json"),
+                    "decisao_roteamento": decisao_grafo.model_dump(mode="json"),
                     "armazenamento_oci": {
                         "bucket": bucket,
                         "caminho_objeto": f"{doc_id_input}.json",
-                        "status_backup": "sucesso"
-                    }
+                        "status_backup": "sucesso",
+                    },
                 }
-                st.info("ℹ️ Triagem processada localmente com as regras clínicas de Lethicia.")
+                st.info("ℹ️ Triagem processada localmente pelo Grafo de Decisão (LangGraph).")
+
+            # Atualiza o banco da sessão para refletir na Fila de Auditoria e no Histórico
+            novo_registro = {
+                "requisicao": {
+                    "documento_id": doc_id_input,
+                    "tipo_arquivo": tipo_arq,
+                    "documento_texto": texto_input or f"[Arquivo {tipo_arq} enviado via upload]",
+                    "canal_origem": canal_input,
+                },
+                "triagem": resultado,
+                "cenario_nome": opcao_cenario,
+                "descricao": "Documento processado durante a sessão.",
+            }
+            st.session_state.documentos_db = [
+                d for d in st.session_state.documentos_db
+                if d["triagem"].get("documento_id") != doc_id_input
+            ] + [novo_registro]
 
             # Exibe resultado detalhado
             st.markdown("### Resultado da Triagem:")
