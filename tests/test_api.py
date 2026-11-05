@@ -23,6 +23,9 @@ from regras.regras_clinicas import TERMOS_PRIORITARIOS, TERMOS_URGENCIA_CRITICA
 PASTA_DADOS = Path(__file__).resolve().parent.parent / "dados_teste"
 
 VARIAVEIS = (
+    "LLM_API_KEY",
+    "GEMINI_API_KEY",
+    "GOOGLE_API_KEY",
     "MEDIFLOW_ARMAZENAMENTO",
     "MEDIFLOW_ARMAZENAMENTO_LOCAL_DIR",
     "OCI_AUTH",

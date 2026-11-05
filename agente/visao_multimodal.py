@@ -33,7 +33,7 @@ from prompts.extracao_clinica import (
 
 load_dotenv()
 
-MODELO_GEMINI_PADRAO = "gemini-2.5-flash"
+MODELO_GEMINI_PADRAO = os.getenv("LLM_MODEL", "gemini-2.5-flash").strip() or "gemini-2.5-flash"
 
 
 def obter_chave_llm() -> Optional[str]:
@@ -82,12 +82,12 @@ def _extrair_medico_heuristico(texto: str) -> MedicoSolicitante:
     crm_fmt: Optional[str] = None
 
     match_med = re.search(
-        r"(?:Solicitante|M[eé]dico(?:\s+Solicitante)?):\s*([^\n\r\.]+)",
+        r"(?:Solicitante|M[eé]dico(?:\s+Solicitante)?):\s*(.+?)(?:\.\s*(?:Exame|Indica|Achados|CONCLUS|Prescri|Resultado|Data|CID)|\n|\r|$)",
         texto,
         flags=re.IGNORECASE,
     )
     if match_med:
-        trecho_med = match_med.group(1).strip()
+        trecho_med = match_med.group(1).strip(" .")
         match_crm = re.search(r"CRM(?:-|\s*)([A-Z]{2})?\s*[:\-]?\s*(\d{3,8})(?:-([A-Z]{2}))?", trecho_med, flags=re.IGNORECASE)
         if match_crm:
             uf = (match_crm.group(1) or match_crm.group(3) or "SP").upper()
@@ -119,7 +119,7 @@ def extrair_dados_heuristico_fallback(
     Motor determinístico de fallback clínico para quando a chave da API Gemini não está
     configurada (ex.: testes automatizados offline ou ambiente CI) ou em caso de indisponibilidade.
     """
-    texto_limpo = (texto or "").strip()
+    texto_limpo = " ".join((texto or "").split())
     texto_lower = texto_limpo.lower()
 
     tem_ilegibilidade = any(
@@ -149,12 +149,20 @@ def extrair_dados_heuristico_fallback(
     elif "atestado" in texto_lower:
         tipo_doc = TipoDocumento.ATESTADO.value
         especialidade = "Clínica Médica"
-    else:
-        tipo_doc = (
-            TipoDocumento.OUTRO_DESCONHECIDO.value
-            if not texto_limpo or tem_ilegibilidade
-            else TipoDocumento.LAUDO_EXAME_LABORATORIAL.value
+    elif not texto_limpo or tem_ilegibilidade or not (
+        paciente.nome or medico.crm or "conclusão:" in texto_lower or "conclusao:" in texto_lower
+    ):
+        return (
+            ClassificacaoDocumento(
+                tipo_documento=TipoDocumento.OUTRO_DESCONHECIDO.value,
+                especialidade=None,
+                nivel_prioridade=NivelPrioridade.ROTINA,
+                score_confianca_classificacao=0.0,
+            ),
+            DadosExtraidos(),
         )
+    else:
+        tipo_doc = TipoDocumento.LAUDO_EXAME_LABORATORIAL.value
         especialidade = "Geral"
 
     # Identificação de exame realizado

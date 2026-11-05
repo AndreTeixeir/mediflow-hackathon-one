@@ -132,7 +132,13 @@ def ingerir_documento_clinico(entrada: DocumentoEntrada) -> ConteudoDocumentoIng
             )
 
         if formato in ("PNG", "JPG", "JPEG", "WEBP"):
-            img_norm, mime_img, dimensoes = normalizar_imagem_bytes(raw_bytes)
+            try:
+                img_norm, mime_img, dimensoes = normalizar_imagem_bytes(raw_bytes)
+                meta_img = f"Imagem clínica ({dimensoes[0]}x{dimensoes[1]}) preparada para OCR / Visão Multimodal."
+            except Exception as exc:
+                img_norm = raw_bytes
+                mime_img = mime_type
+                meta_img = f"Imagem em bytes brutos ({exc}); encaminhada para análise multimodal / revisão humana."
             return ConteudoDocumentoIngerido(
                 documento_id=entrada.documento_id,
                 formato_normalizado=formato,
@@ -140,7 +146,7 @@ def ingerir_documento_clinico(entrada: DocumentoEntrada) -> ConteudoDocumentoIng
                 texto_extraido=texto_inicial,
                 bytes_midia=img_norm,
                 requer_visao_multimodal=True,
-                metadados_leitura=f"Imagem clínica ({dimensoes[0]}x{dimensoes[1]}) preparada para OCR / Visão Multimodal.",
+                metadados_leitura=meta_img,
             )
 
         if formato in ("TXT", "JSON"):
