@@ -14,7 +14,8 @@ services:
     container_name: mediflow-api
     restart: unless-stopped
     env_file:
-      - ../.env
+      - path: ../.env
+        required: false
     environment:
       - PYTHONPATH=/app
     ports:
@@ -40,7 +41,8 @@ services:
     container_name: mediflow-ui
     restart: unless-stopped
     env_file:
-      - ../.env
+      - path: ../.env
+        required: false
     environment:
       - PYTHONPATH=/app
       - MEDIFLOW_API_URL=http://mediflow-api:8000
@@ -57,6 +59,12 @@ services:
       - "--server.port=8501"
       - "--server.address=0.0.0.0"
       - "--server.headless=true"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
     security_opt:
       - no-new-privileges:true
     cap_drop:

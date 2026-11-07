@@ -71,6 +71,7 @@ Implementação do motor de orquestração autônomo com **LangGraph (`StateGrap
 - [x] Implementação da infraestrutura Docker, Nginx e script de firewall OCI (`deploy/`).
 - [x] Resolução de todos os pontos de integração da Fase 1 atribuídos à Ingrid (`E1`, `E5`, `E6`, `E7`, `E8`).
 - [x] Code Review e Merge do **PR #3** do André (`api/` e `armazenamento/`).
-- [ ] **Próximo Passo 1 (Imediato):** Concluir o Merge do **PR #2** (`feature/agente-deploy-ingrid`) na `main` (já aprovado pelo André e com `mergeable_state: clean`).
-- [ ] **Próximo Passo 2 (Integração API $\leftrightarrow$ Grafo):** Criar/revisar a branch `feat/api-grafo` trocando o `api/agente_simulado.py` pela chamada real ao pacote `agente` em `api/triagem.py`.
-- [ ] **Próximo Passo 3 (Deploy Final em Nuvem OCI):** Após o merge da interface Streamlit (`interface/`) e ajustes finais da API, subir a aplicação na VM da OCI Always Free utilizando `deploy/setup_oci_vm.sh` e `deploy/docker-compose.yml`.
+- [x] **Merge do PR #2 (`feature/agente-deploy-ingrid`) na `main` (`d67e823`):** Grafo LangGraph, Visão Multimodal, Prompts e Deploy integrados na branch principal.
+- [x] **Integração API $\leftrightarrow$ Grafo (Item E7):** `api/triagem.py` conectado ao grafo real (`executar_triagem_mediflow` / `analisar_documento` do pacote `agente`), `.env.example` documentado com Google Gemini (`gemini-2.5-flash`) e 90/90 testes automatizados passando.
+- [x] **Code Review, Merge e Integração da Interface Streamlit (PR #4 — `interface/app.py`):** Integrada na `main` com suporte a `MEDIFLOW_API_URL` (local/Docker), upload multimodal (`PDF`/`PNG`/`JPG` em Base64) e conexão direta com a API e o Grafo LangGraph.
+- [ ] **Próximo Passo Final (Deploy em Nuvem OCI):** Subir a aplicação integrada na VM da OCI Always Free utilizando `deploy/setup_oci_vm.sh` e `deploy/docker-compose.yml`.
