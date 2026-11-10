@@ -318,7 +318,11 @@ def analisar_documento_com_gemini(
 
             resultado_parsed: Optional[ResultadoExtracaoLLM] = getattr(resposta, "parsed", None)
             if resultado_parsed is None and resposta.text:
-                resultado_parsed = ResultadoExtracaoLLM.model_validate_json(resposta.text)
+                raw_json = resposta.text.strip()
+                if raw_json.startswith("```"):
+                    raw_json = re.sub(r"^```(?:json)?\s*", "", raw_json, flags=re.IGNORECASE)
+                    raw_json = re.sub(r"\s*```$", "", raw_json)
+                resultado_parsed = ResultadoExtracaoLLM.model_validate_json(raw_json)
 
             if resultado_parsed is not None:
                 logger.info("Extração estruturada via Gemini (%s) concluída com sucesso.", modelo)
