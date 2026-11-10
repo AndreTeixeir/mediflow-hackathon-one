@@ -8,10 +8,11 @@ Fonte única de verdade para os modelos de entrada, saída, entidades clínicas 
 """
 
 import os
+from datetime import datetime
 from typing import List, Optional
 from enum import Enum
 from dotenv import load_dotenv
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 # Carrega variáveis de ambiente do .env caso existam
 load_dotenv()
@@ -51,6 +52,9 @@ class DestinoRoteamento(str, Enum):
     FARMACIA_HOSPITALAR = "Farmacia_Hospitalar"
     PRONTUARIO_ELETRONICO = "Prontuario_Eletronico_do_Paciente"
     FILA_REVISAO_HUMANA = "Fila_Revisao_Humana"
+    # Acrescentado na auditoria humana pela API: o destino de um documento rejeitado por quem revisou.
+    # Nenhum valor anterior mudou, e o grafo nunca o produz.
+    DOCUMENTO_REJEITADO = "Documento_Rejeitado"
 
 
 class CanalOrigem(str, Enum):
@@ -250,3 +254,70 @@ class DecisaoAuditoriaHumana(BaseModel):
     motivo_rejeicao: Optional[str] = Field(None, description="Motivo caso rejeitado")
     dados_corrigidos: Optional[DadosExtraidos] = Field(None, description="Dados clínicos após correção manual")
     destino_final: Optional[DestinoRoteamento] = Field(None, description="Novo destino definido pelo auditor")
+
+
+# ============================================================================
+# 5. AUDITORIA HUMANA PELA API (api/auditoria.py)
+# Acréscimos: nenhum campo dos modelos acima mudou. A DecisaoAuditoriaHumana da seção 4
+# continua aqui; a API usa a DecisaoAuditoriaRequisicao, com os três destinos da fila.
+# ============================================================================
+
+class DestinoAuditoria(str, Enum):
+    """Para onde quem revisa manda um documento retido: rotina, urgente ou rejeitado."""
+    ROTINA = "rotina"
+    URGENTE = "urgente"
+    REJEITADO = "rejeitado"
+
+
+class DecisaoAuditoriaRequisicao(BaseModel):
+    """Corpo de POST /api/v1/auditoria/{documento_id}/decisao."""
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    destino: DestinoAuditoria = Field(..., description="rotina, urgente ou rejeitado", examples=["urgente"])
+    revisor: str = Field(..., min_length=1, max_length=80, description="Nome de quem revisou", examples=["Lethicia"])
+    justificativa: str = Field(
+        ...,
+        min_length=5,
+        max_length=500,
+        description="Por que quem revisou tomou esta decisão",
+        examples=["Dados conferidos com o documento original: quadro agudo."],
+    )
+
+
+class RegistroAuditoriaHumana(BaseModel):
+    """
+    O registro da decisão humana, gravado dentro do JSON do documento. Guarda também o que o grafo
+    tinha decidido, para a trilha mostrar o que a IA decidiu e o que a pessoa mudou.
+    """
+    revisor: str
+    decidido_em: datetime = Field(..., description="Momento da decisão, em UTC (ISO 8601)")
+    destino: DestinoAuditoria
+    justificativa: str
+    destino_original: DestinoRoteamento = Field(..., description="Destino que o grafo tinha decidido")
+    justificativa_original: str = Field(..., description="Justificativa do roteamento feita pelo grafo")
+
+
+class DocumentoAuditado(TriagemResposta):
+    """A TriagemResposta do documento depois da decisão humana, com o registro da auditoria."""
+    auditoria_humana: RegistroAuditoriaHumana
+
+
+class ItemPendenteAuditoria(BaseModel):
+    """Um documento na fila de GET /api/v1/auditoria/pendentes."""
+    documento_id: str
+    tipo_documento: str
+    nivel_prioridade: NivelPrioridade
+    score_confianca_classificacao: float
+    justificativa_roteamento: str
+    dados_extraidos: DadosExtraidos
+    data: datetime = Field(..., description="Quando o documento entrou na fila, em UTC")
+
+
+class ResumoDocumento(BaseModel):
+    """Uma linha de GET /api/v1/documentos."""
+    documento_id: str
+    bucket: str
+    status: StatusProcessamento
+    nivel_prioridade: NivelPrioridade
+    destino_principal: DestinoRoteamento
+    data: datetime = Field(..., description="Quando o documento foi gravado no bucket, em UTC")

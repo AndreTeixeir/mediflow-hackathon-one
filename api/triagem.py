@@ -34,6 +34,7 @@ def _bucket_destino(destino: DestinoRoteamento, buckets: NomesBuckets) -> str:
         DestinoRoteamento.FARMACIA_HOSPITALAR: buckets.rotina,
         DestinoRoteamento.AUDITORIA_AUTORIZACOES: buckets.rotina,
         DestinoRoteamento.PRONTUARIO_ELETRONICO: buckets.rotina,
+        DestinoRoteamento.DOCUMENTO_REJEITADO: buckets.rejeitados,
     }
     return por_destino[destino]
 

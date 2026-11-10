@@ -148,14 +148,13 @@ class TestAgenteMediFlowLangGraph(unittest.TestCase):
                 self.assertEqual(resposta.decisao_roteamento.requer_auditoria_humana, em_revisao)
 
     def test_status_para_destino_so_marca_pendente_a_fila_de_revisao_humana(self):
+        especiais = {
+            DestinoRoteamento.FILA_REVISAO_HUMANA: StatusProcessamento.PENDENTE_AUDITORIA,
+            DestinoRoteamento.DOCUMENTO_REJEITADO: StatusProcessamento.REJEITADO,
+        }
         for destino in DestinoRoteamento:
             with self.subTest(destino=destino.value):
-                esperado = (
-                    StatusProcessamento.PENDENTE_AUDITORIA
-                    if destino == DestinoRoteamento.FILA_REVISAO_HUMANA
-                    else StatusProcessamento.PROCESSADO
-                )
-                self.assertEqual(status_para_destino(destino), esperado)
+                self.assertEqual(status_para_destino(destino), especiais.get(destino, StatusProcessamento.PROCESSADO))
 
     def test_penalidade_de_consistencia_e_aplicada_uma_so_vez(self):
         """Laudo sem CRM: o score da classificação e o citado na justificativa são o mesmo (0.83, não 0.68)."""

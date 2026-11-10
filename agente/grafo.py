@@ -69,9 +69,12 @@ CAMINHO_POR_DESTINO = {
 
 
 def status_para_destino(destino: DestinoRoteamento) -> StatusProcessamento:
-    """Fila_Revisao_Humana implica sempre pendente_auditoria; qualquer outro destino, processado."""
+    """Fila_Revisao_Humana implica sempre pendente_auditoria, Documento_Rejeitado implica rejeitado
+    (só a auditoria humana o produz) e qualquer outro destino, processado."""
     if destino == DestinoRoteamento.FILA_REVISAO_HUMANA:
         return StatusProcessamento.PENDENTE_AUDITORIA
+    if destino == DestinoRoteamento.DOCUMENTO_REJEITADO:
+        return StatusProcessamento.REJEITADO
     return StatusProcessamento.PROCESSADO
 
 
