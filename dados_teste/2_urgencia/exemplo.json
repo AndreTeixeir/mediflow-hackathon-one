@@ -19,7 +19,9 @@
     "dados_extraidos": {
       "paciente": {
         "nome": "Carlos Eduardo Mendes",
-        "idade": 52
+        "idade": 52,
+        "cpf": null,
+        "sexo": null
       },
       "medico_solicitante": {
         "nome": "Dra. Renata Silveira",
@@ -29,20 +31,20 @@
       "diagnostico_principal": "Tromboembolismo Pulmonar Agudo (TEP)",
       "cid_sugerido": "I26.9",
       "medicamentos": null,
-      "observacoes_clinicas": "Falha de enchimento em arteria pulmonar principal direita compatível com TEP agudo."
+      "observacoes_clinicas": "Falha de enchimento em arteria pulmonar principal direita compativel com TEP agudo."
     },
     "decisao_roteamento": {
       "destino_principal": "Fila_Emergencia_Medica",
       "requer_auditoria_humana": false,
-      "justificativa_roteamento": "Achado critico de alta gravidade (TEP agudo) detectado em paciente sintomatico.",
+      "justificativa_roteamento": "Achado crítico de alta gravidade (TEP) detectado em paciente sintomático.",
       "notificacao_gerada": {
         "canal": "Alerta_Plantao_Medico",
-        "mensagem": "ALERTA URGENTE: Laudo critico de TEP Agudo para paciente Carlos Eduardo Mendes no Pronto-Socorro."
+        "mensagem": "ALERTA URGENTE: Laudo critico de Tromboembolismo Pulmonar Agudo (TEP) para paciente Carlos Eduardo Mendes no Pronto_Socorro."
       }
     },
     "armazenamento_oci": {
-      "bucket": "mediflow-documentos-clinicos",
-      "caminho_objeto": "processados/urgentes/DOC-CLIN-2026-8942.json",
+      "bucket": "mediflow-urgentes",
+      "caminho_objeto": "DOC-CLIN-2026-8942.json",
       "status_backup": "sucesso"
     }
   }

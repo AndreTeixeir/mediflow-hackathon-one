@@ -14,15 +14,17 @@
       "tipo_documento": "Receituário Médico",
       "especialidade": "Clínica Geral",
       "nivel_prioridade": "Prioritário",
-      "score_confianca_classificacao": 0.45
+      "score_confianca_classificacao": 0.0
     },
     "dados_extraidos": {
       "paciente": {
-        "nome": "Silva (incompleto / ilegível)",
-        "idade": null
+        "nome": null,
+        "idade": null,
+        "cpf": null,
+        "sexo": null
       },
       "medico_solicitante": {
-        "nome": "Dr. A... (não legível)",
+        "nome": "Dr. A (não legível)",
         "crm": null
       },
       "exame_realizado": null,
@@ -42,12 +44,12 @@
     "decisao_roteamento": {
       "destino_principal": "Fila_Revisao_Humana",
       "requer_auditoria_humana": true,
-      "justificativa_roteamento": "Score de confiança baixo (0.45). Inconsistências: Nome do paciente ausente ou incompleto; CRM não informado ou vazio; Documento contém trechos ilegíveis ou rasuras detectadas.",
+      "justificativa_roteamento": "CRM do médico ausente ou inválido: CRM não informado ou vazio. Score de confiança baixo (0.00). Inconsistências: Nome do paciente ausente ou incompleto; Documento contém trechos ilegíveis ou rasuras detectadas. Encaminhado para revisão humana.",
       "notificacao_gerada": null
     },
     "armazenamento_oci": {
-      "bucket": "mediflow-documentos-clinicos",
-      "caminho_objeto": "auditoria_humana/DOC-CLIN-2026-3319.json",
+      "bucket": "mediflow-auditoria-humana",
+      "caminho_objeto": "DOC-CLIN-2026-3319.json",
       "status_backup": "sucesso"
     }
   }
