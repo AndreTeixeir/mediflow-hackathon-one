@@ -22,7 +22,8 @@ from pypdf import PdfWriter
 import api.triagem as modulo_triagem
 from api.main import app, obter_repositorio
 from armazenamento.repositorio import FalhaArmazenamento, RepositorioLocal
-from regras.regras_clinicas import TERMOS_PRIORITARIOS, TERMOS_URGENCIA_CRITICA
+from contratos.modelos import DadosExtraidos
+from regras.regras_clinicas import NivelUrgencia, classificar_nivel_urgencia
 
 PASTA_DADOS = Path(__file__).resolve().parent.parent / "dados_teste"
 
@@ -44,8 +45,7 @@ CENARIOS = [
     ("3_auditoria_humana", "Fila_Revisao_Humana", "pendente_auditoria", "mediflow-auditoria-humana"),
 ]
 
-# Sem nenhum termo de urgência das regras: a busca delas é por substring ("tep", "iam", "pcr"
-# casam dentro de outras palavras). O primeiro teste que usa este texto confere isso.
+# Sem nenhum termo de urgência das regras (o primeiro teste que usa este texto confere isso).
 TEXTO_DESCONHECIDO = "Aviso interno: a reuniao de equipe foi remarcada para a proxima semana na sala de treinamento."
 
 
@@ -204,8 +204,7 @@ def test_texto_com_espacos_e_quebras_diferentes_ainda_e_reconhecido(cliente):
 # ============================================================================
 
 def test_documento_desconhecido_vai_para_revisao_humana(cliente, tmp_path):
-    corpo_texto = TEXTO_DESCONHECIDO.lower()
-    assert not any(termo in corpo_texto for termo in TERMOS_URGENCIA_CRITICA + TERMOS_PRIORITARIOS)
+    assert classificar_nivel_urgencia(TEXTO_DESCONHECIDO, DadosExtraidos()).nivel == NivelUrgencia.NENHUM
 
     resposta = cliente.post(
         "/api/v1/triagem", json={"documento_id": "DOC-DESCONHECIDO", "documento_texto": TEXTO_DESCONHECIDO}

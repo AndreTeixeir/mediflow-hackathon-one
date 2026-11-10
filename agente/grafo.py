@@ -26,7 +26,12 @@ from contratos.modelos import (
     StatusProcessamento,
     TriagemResposta,
 )
-from regras.regras_clinicas import calcular_score_confianca, executar_roteamento_clinico
+from regras.regras_clinicas import (
+    NivelUrgencia,
+    calcular_score_confianca,
+    classificar_nivel_urgencia,
+    executar_roteamento_clinico,
+)
 
 
 class EstadoAgenteMediFlow(TypedDict, total=False):
@@ -46,6 +51,15 @@ class EstadoAgenteMediFlow(TypedDict, total=False):
     status_final: StatusProcessamento
     resposta_final: TriagemResposta
 
+
+# Da menor para a maior: um termo prioritário eleva a prioridade até Prioritário, mas nunca rebaixa
+# uma prioridade maior que o LLM já tenha dado.
+ORDEM_DE_PRIORIDADE = (
+    NivelPrioridade.ROTINA,
+    NivelPrioridade.PRIORITARIO,
+    NivelPrioridade.URGENTE,
+    NivelPrioridade.EMERGENCIA,
+)
 
 # Caminho do grafo para cada destino das regras; os demais destinos seguem o fluxo padrão.
 CAMINHO_POR_DESTINO = {
@@ -139,8 +153,17 @@ def no_avaliar_consistencia_e_urgencia(estado: EstadoAgenteMediFlow) -> EstadoAg
         limiar_auditoria_humana=limiar,
     )
 
-    # O score da resposta é o consolidado, o mesmo que a justificativa do roteamento cita.
-    classificacao = classificacao.model_copy(update={"score_confianca_classificacao": score_calculado})
+    # O score da resposta é o consolidado, o mesmo que a justificativa do roteamento cita. O nível
+    # de prioridade vem da função própria das regras, nunca da leitura do texto da justificativa.
+    nivel_prioridade = classificacao.nivel_prioridade
+    if (
+        classificar_nivel_urgencia(texto, dados).nivel == NivelUrgencia.PRIORITARIO
+        and ORDEM_DE_PRIORIDADE.index(nivel_prioridade) < ORDEM_DE_PRIORIDADE.index(NivelPrioridade.PRIORITARIO)
+    ):
+        nivel_prioridade = NivelPrioridade.PRIORITARIO
+    classificacao = classificacao.model_copy(
+        update={"score_confianca_classificacao": score_calculado, "nivel_prioridade": nivel_prioridade}
+    )
 
     return {
         "classificacao": classificacao,
