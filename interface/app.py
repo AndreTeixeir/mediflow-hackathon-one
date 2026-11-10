@@ -9,26 +9,13 @@ Execução a partir da raiz: python -m streamlit run interface/app.py
 import base64
 import json
 import os
+import uuid
+
 import requests
 import streamlit as st
 from dotenv import load_dotenv
 
-from agente import executar_triagem_mediflow
-from contratos.modelos import (
-    CanalOrigem,
-    ClassificacaoDocumento,
-    DadosExtraidos,
-    DecisaoRoteamento,
-    DestinoRoteamento,
-    DocumentoEntrada,
-    MedicoSolicitante,
-    NivelPrioridade,
-    Paciente,
-    StatusProcessamento,
-    TipoDocumento,
-    TriagemResposta,
-)
-from regras.regras_clinicas import executar_roteamento_clinico
+from contratos.modelos import CanalOrigem, DestinoRoteamento
 
 load_dotenv()
 
@@ -36,6 +23,15 @@ API_BASE_URL = (
     os.getenv("MEDIFLOW_API_URL", "http://localhost:8000").strip().rstrip("/")
     or "http://localhost:8000"
 )
+
+# Limite do arquivo na tela, conferido antes de enviar. A API aceita 15 MB no corpo inteiro e o
+# Base64 incha o arquivo em cerca de 33%: 10 MB viram ~13,4 MB e ainda cabem.
+TAMANHO_MAXIMO_MB = 10
+# O pior caso da API é 3 chamadas ao Gemini de até 25 s mais as esperas (81 s): o timeout fica acima.
+TIMEOUT_API_SEGUNDOS = 90
+MODO_TEXTO = "Texto do documento"
+MODO_ARQUIVO = "Enviar arquivo PDF ou imagem"
+CANAIS_ORIGEM = [canal.value for canal in CanalOrigem]
 
 # Configuração visual da página
 st.set_page_config(
@@ -103,6 +99,65 @@ if "documentos_db" not in st.session_state:
 
 if "historico_auditorias" not in st.session_state:
     st.session_state.historico_auditorias = []
+
+
+def gerar_novo_id() -> None:
+    """Gera um ID e o mantém no estado da sessão. Roda como on_click, antes de o campo ser redesenhado."""
+    st.session_state["documento_id"] = f"DOC-DEMO-{uuid.uuid4().hex[:8].upper()}"
+
+
+# O ID fica na sessão: um value= com UUID novo a cada execução descartaria o que a pessoa digitou.
+if "documento_id" not in st.session_state:
+    gerar_novo_id()
+
+
+def tipo_pela_extensao(nome_arquivo: str) -> str:
+    """PDF, PNG, JPG, JPEG ou WEBP, pela extensão do arquivo enviado."""
+    return nome_arquivo.rsplit(".", 1)[-1].upper()
+
+
+def enviar_triagem(payload: dict) -> dict | None:
+    """Envia o documento à API. Devolve a resposta, ou None depois de mostrar o erro na tela.
+
+    Nenhum resultado é simulado: se a API não responder 200, não há triagem.
+    """
+    endereco = f"{API_BASE_URL}/api/v1/triagem"
+    try:
+        with st.spinner("Enviando documento para a API MediFlow..."):
+            resposta = requests.post(endereco, json=payload, timeout=TIMEOUT_API_SEGUNDOS)
+    except requests.exceptions.ConnectionError:
+        st.error("Não foi possível conectar à API.")
+        st.write(f"Endereço tentado: `{endereco}`")
+        st.info("Inicie a API FastAPI ou confira a variável MEDIFLOW_API_URL.")
+        return None
+    except requests.exceptions.Timeout:
+        st.error("A API demorou demais para responder. Tente novamente ou verifique os logs do back-end.")
+        return None
+    except requests.exceptions.RequestException as erro:
+        st.error(f"Erro na comunicação com a API ({type(erro).__name__}).")
+        return None
+
+    if resposta.status_code == 200:
+        try:
+            return resposta.json()
+        except ValueError:
+            st.error("A resposta da API não veio em JSON válido.")
+            return None
+
+    if resposta.status_code == 409:
+        st.error('Já existe um documento com esse ID. Clique em "Gerar novo ID" e envie de novo.')
+    elif resposta.status_code == 422:
+        st.error("A API recusou os dados enviados (HTTP 422).")
+        try:
+            st.json(resposta.json())
+        except ValueError:
+            st.code(resposta.text[:1000])
+    elif resposta.status_code == 503:
+        st.error("O armazenamento está indisponível no momento (HTTP 503). Tente de novo em instantes.")
+    else:
+        st.error(f"A API respondeu com HTTP {resposta.status_code}.")
+        st.code(resposta.text[:1000])
+    return None
 
 
 # ============================================================================
@@ -296,131 +351,93 @@ with tab_auditoria:
 
 
 # ----------------------------------------------------------------------------
-# ABA 2: ENVIO E TESTE DOS CENÁRIOS
+# ABA 2: ENVIO E TRIAGEM (lógica de envio da página do Guilherme, no visual da Lethicia)
 # ----------------------------------------------------------------------------
 with tab_envio:
     st.subheader("📤 Enviar Documento para Triagem")
-    st.caption("Você pode testar enviando um texto avulso ou carregar diretamente um dos 3 cenários oficiais.")
+    st.caption("Envie o texto de um documento ou um PDF/imagem. Use apenas dados fictícios ou anonimizados.")
 
-    opcao_cenario = st.selectbox(
-        "Carregar Exemplo Pré-definido:",
-        ["Nenhum (Digitar manualmente)", "Cenário 1: Rotina (Hemograma)", "Cenário 2: Urgência (TEP Agudo)", "Cenário 3: Ambíguo (Receita Rasurada)"]
+    modo_envio = st.radio(
+        "Como deseja fornecer o documento?",
+        [MODO_TEXTO, MODO_ARQUIVO],
+        horizontal=True,
+        key="modo_envio",
     )
 
-    texto_padrao = ""
-    id_padrao = "DOC-CLIN-NOVO-01"
-    canal_padrao = "Pronto_Socorro"
+    texto_input = ""
+    arquivo_upload = None
+    if modo_envio == MODO_TEXTO:
+        texto_input = st.text_area("Texto do Documento Clínico:", height=180, key="texto_envio")
+    else:
+        arquivo_upload = st.file_uploader(
+            "Selecione um arquivo clínico (PDF digital/digitalizado ou imagem de receita/laudo):",
+            type=["pdf", "png", "jpg", "jpeg", "webp"],
+            help=f"Até {TAMANHO_MAXIMO_MB} MB. Use somente documentos sintéticos ou anonimizados.",
+            key="arquivo_envio",
+        )
 
-    if "Cenário 1" in opcao_cenario:
-        c1 = [d for d in st.session_state.documentos_db if "Cenário 1" in d["cenario_nome"]]
-        if c1:
-            texto_padrao = c1[0]["requisicao"]["documento_texto"]
-            id_padrao = "DOC-ROTINA-TESTE"
-            canal_padrao = "Ambulatorio"
-    elif "Cenário 2" in opcao_cenario:
-        c2 = [d for d in st.session_state.documentos_db if "Cenário 2" in d["cenario_nome"]]
-        if c2:
-            texto_padrao = c2[0]["requisicao"]["documento_texto"]
-            id_padrao = "DOC-URGENCIA-TESTE"
-            canal_padrao = "Pronto_Socorro"
-    elif "Cenário 3" in opcao_cenario:
-        c3 = [d for d in st.session_state.documentos_db if "Cenário 3" in d["cenario_nome"]]
-        if c3:
-            texto_padrao = c3[0]["requisicao"]["documento_texto"]
-            id_padrao = "DOC-AMBIGUO-TESTE"
-            canal_padrao = "Ambulatorio"
+    col_id, col_novo_id, col_canal = st.columns([3, 1, 2], vertical_alignment="bottom")
+    with col_id:
+        doc_id_input = st.text_input(
+            "ID do Documento:",
+            key="documento_id",
+            help="Só letras, números e hífen, até 64 caracteres. Cada envio precisa de um ID novo.",
+        )
+    with col_novo_id:
+        st.button("Gerar novo ID", on_click=gerar_novo_id, width="stretch", key="btn_novo_id")
+    with col_canal:
+        canal_input = st.selectbox("Canal de Origem:", CANAIS_ORIGEM, key="canal_envio")
 
-    col_e1, col_e2 = st.columns([2, 1])
-    with col_e1:
-        doc_id_input = st.text_input("ID do Documento:", value=id_padrao)
-    with col_e2:
-        canal_input = st.selectbox("Canal de Origem:", ["Pronto_Socorro", "Ambulatorio", "Internacao"], index=0 if canal_padrao == "Pronto_Socorro" else 1)
-
-    texto_input = st.text_area("Texto do Documento Clínico:", value=texto_padrao, height=180)
-    arquivo_upload = st.file_uploader(
-        "Ou envie um arquivo clínico (PDF digital/digitalizado ou Imagem de receita/laudo):",
-        type=["pdf", "png", "jpg", "jpeg", "webp"],
-    )
-
-    if st.button("🚀 Processar Triagem Automática", use_container_width=True):
-        if not texto_input.strip() and arquivo_upload is None:
-            st.error("Por favor, informe o texto do documento ou faça upload de um arquivo.")
+    if st.button("🚀 Processar Triagem Automática", type="primary", width="stretch", key="btn_processar"):
+        # if/elif em vez de st.stop(): o stop interromperia o script e a aba de histórico sumiria.
+        if modo_envio == MODO_TEXTO and not texto_input.strip():
+            st.error("Insira o texto do documento antes de enviar.")
+        elif modo_envio == MODO_ARQUIVO and arquivo_upload is None:
+            st.error("Selecione um arquivo antes de enviar.")
+        elif arquivo_upload is not None and arquivo_upload.size > TAMANHO_MAXIMO_MB * 1024 * 1024:
+            st.error(f"O arquivo passa de {TAMANHO_MAXIMO_MB} MB. Envie um arquivo menor.")
         else:
-            tipo_arq = "TXT"
-            doc_b64 = None
+            payload = {"documento_id": doc_id_input, "canal_origem": canal_input}
             if arquivo_upload is not None:
-                ext = arquivo_upload.name.rsplit(".", 1)[-1].upper() if "." in arquivo_upload.name else "PDF"
-                tipo_arq = "JPG" if ext == "JPEG" else ext
-                doc_b64 = base64.b64encode(arquivo_upload.getvalue()).decode("utf-8")
+                tipo_arq = tipo_pela_extensao(arquivo_upload.name)
+                # A API recebe o arquivo em Base64 dentro do JSON.
+                payload["tipo_arquivo"] = tipo_arq
+                payload["documento_base64"] = base64.b64encode(arquivo_upload.getvalue()).decode("ascii")
+            else:
+                tipo_arq = "TXT"
+                payload["tipo_arquivo"] = tipo_arq
+                payload["documento_texto"] = texto_input
 
-            payload = {
-                "documento_id": doc_id_input,
-                "tipo_arquivo": tipo_arq,
-                "documento_texto": texto_input if texto_input.strip() else None,
-                "documento_base64": doc_b64,
-                "canal_origem": canal_input,
-            }
+            resultado = enviar_triagem(payload)
 
-            # Chama a API FastAPI (respeitando MEDIFLOW_API_URL para local e Docker)
-            try:
-                resp = requests.post(f"{API_BASE_URL}/api/v1/triagem", json=payload, timeout=30)
-                if resp.status_code == 200:
-                    resultado = resp.json()
-                    st.success("✅ Triagem processada com sucesso via API FastAPI + Grafo LangGraph!")
-                else:
-                    st.warning(f"API respondeu com status {resp.status_code}. Executando via Grafo LangGraph local...")
-                    raise requests.exceptions.RequestException()
-            except requests.exceptions.RequestException:
-                # Fallback local: executa o Grafo LangGraph diretamente
-                entrada_obj = DocumentoEntrada(**payload)
-                resposta_grafo = executar_triagem_mediflow(entrada_obj)
-                decisao_grafo = resposta_grafo.decisao_roteamento
+            if resultado is not None:
+                st.success("✅ Triagem processada com sucesso via API FastAPI + Grafo LangGraph!")
 
-                bucket = "mediflow-rotina"
-                if decisao_grafo.destino_principal == DestinoRoteamento.FILA_EMERGENCIA:
-                    bucket = "mediflow-urgentes"
-                elif decisao_grafo.destino_principal == DestinoRoteamento.FILA_REVISAO_HUMANA:
-                    bucket = "mediflow-auditoria-humana"
-
-                resultado = {
-                    "status": resposta_grafo.status.value,
-                    "documento_id": doc_id_input,
-                    "classificacao": resposta_grafo.classificacao.model_dump(mode="json"),
-                    "dados_extraidos": resposta_grafo.dados_extraidos.model_dump(mode="json"),
-                    "decisao_roteamento": decisao_grafo.model_dump(mode="json"),
-                    "armazenamento_oci": {
-                        "bucket": bucket,
-                        "caminho_objeto": f"{doc_id_input}.json",
-                        "status_backup": "sucesso",
+                # Só uma triagem que a API confirmou entra no banco da sessão.
+                novo_registro = {
+                    "requisicao": {
+                        "documento_id": doc_id_input,
+                        "tipo_arquivo": tipo_arq,
+                        "documento_texto": texto_input or f"[Arquivo {tipo_arq} enviado via upload]",
+                        "canal_origem": canal_input,
                     },
+                    "triagem": resultado,
+                    "cenario_nome": "Envio pela tela",
+                    "descricao": "Documento processado durante a sessão.",
                 }
-                st.info("ℹ️ Triagem processada localmente pelo Grafo de Decisão (LangGraph).")
+                st.session_state.documentos_db = [
+                    d for d in st.session_state.documentos_db
+                    if d["triagem"].get("documento_id") != doc_id_input
+                ] + [novo_registro]
 
-            # Atualiza o banco da sessão para refletir na Fila de Auditoria e no Histórico
-            novo_registro = {
-                "requisicao": {
-                    "documento_id": doc_id_input,
-                    "tipo_arquivo": tipo_arq,
-                    "documento_texto": texto_input or f"[Arquivo {tipo_arq} enviado via upload]",
-                    "canal_origem": canal_input,
-                },
-                "triagem": resultado,
-                "cenario_nome": opcao_cenario,
-                "descricao": "Documento processado durante a sessão.",
-            }
-            st.session_state.documentos_db = [
-                d for d in st.session_state.documentos_db
-                if d["triagem"].get("documento_id") != doc_id_input
-            ] + [novo_registro]
-
-            # Exibe resultado detalhado
-            st.markdown("### Resultado da Triagem:")
-            col_r1, col_r2 = st.columns(2)
-            with col_r1:
-                st.json(resultado["classificacao"])
-                st.json(resultado["decisao_roteamento"])
-            with col_r2:
-                st.json(resultado["dados_extraidos"])
+                # Exibe resultado detalhado
+                st.markdown("### Resultado da Triagem:")
+                col_r1, col_r2 = st.columns(2)
+                with col_r1:
+                    st.json(resultado["classificacao"])
+                    st.json(resultado["decisao_roteamento"])
+                with col_r2:
+                    st.json(resultado["dados_extraidos"])
 
 
 # ----------------------------------------------------------------------------
