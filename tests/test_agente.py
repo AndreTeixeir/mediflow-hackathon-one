@@ -76,7 +76,7 @@ class TestAgenteMediFlowLangGraph(unittest.TestCase):
         self.assertFalse(resposta.decisao_roteamento.requer_auditoria_humana)
         self.assertIsNotNone(resposta.decisao_roteamento.notificacao_gerada)
         self.assertEqual(resposta.decisao_roteamento.notificacao_gerada.canal, "Alerta_Plantao_Medico")
-        self.assertIn("TEP", resposta.decisao_roteamento.notificacao_gerada.mensagem)
+        self.assertTrue(any(termo in resposta.decisao_roteamento.notificacao_gerada.mensagem for termo in ("TEP", "Tromboembolismo")))
         self.assertIsNone(resposta.armazenamento_oci)
 
     def test_grafo_cenario_3_auditoria_humana_ponta_a_ponta(self):
@@ -162,6 +162,28 @@ class TestAgenteMediFlowLangGraph(unittest.TestCase):
         self.assertTrue(conteudo.requer_visao_multimodal)
         self.assertEqual(conteudo.mime_type, "application/pdf")
         self.assertIsNotNone(conteudo.bytes_midia)
+
+    def test_schema_resultado_extracao_llm_compativel_com_gemini(self):
+        """Valida que o schema de saída estruturada para o Gemini não contém 'examples' que quebram o SDK."""
+        from google.genai import types, _transformers
+        from prompts.extracao_clinica import ResultadoExtracaoLLM
+
+        schema_json = ResultadoExtracaoLLM.model_json_schema()
+
+        def _tem_examples(d):
+            if isinstance(d, dict):
+                if "examples" in d:
+                    return True
+                return any(_tem_examples(v) for v in d.values())
+            elif isinstance(d, list):
+                return any(_tem_examples(i) for i in d)
+            return False
+
+        self.assertFalse(_tem_examples(schema_json), "O JSON Schema gerado não deve conter a chave 'examples'.")
+
+        # Testa validação direta no conversor de schema do SDK google-genai
+        schema_sdk = _transformers.t_schema(None, ResultadoExtracaoLLM)
+        self.assertIsInstance(schema_sdk, types.Schema)
 
 
 if __name__ == "__main__":

@@ -6,6 +6,7 @@ Responsável: Ingrid Soares
 Mapeamento: agente/visao_multimodal.py
 """
 
+import logging
 import os
 import re
 from typing import Optional, Tuple
@@ -32,6 +33,8 @@ from prompts.extracao_clinica import (
 )
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 MODELO_GEMINI_PADRAO = os.getenv("LLM_MODEL", "gemini-2.5-flash").strip() or "gemini-2.5-flash"
 
@@ -318,15 +321,20 @@ def analisar_documento_com_gemini(
                 resultado_parsed = ResultadoExtracaoLLM.model_validate_json(resposta.text)
 
             if resultado_parsed is not None:
+                logger.info("Extração estruturada via Gemini (%s) concluída com sucesso.", modelo)
                 texto_final = texto_atual or resultado_parsed.texto_transcrito_ocr or ""
                 return (
                     resultado_parsed.classificacao,
                     resultado_parsed.dados_extraidos,
                     texto_final,
                 )
-        except Exception:
-            # Em caso de falha de rede/quota da API externa, garante continuidade pelo fallback clínico
-            pass
+        except Exception as exc:
+            logger.warning(
+                "Falha na chamada ao modelo Gemini %s (%s: %s). Ativando fallback clínico determinístico.",
+                modelo,
+                type(exc).__name__,
+                exc,
+            )
 
     classificacao, dados = extrair_dados_heuristico_fallback(
         texto_atual,
