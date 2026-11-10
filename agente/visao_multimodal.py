@@ -225,9 +225,9 @@ def extrair_dados_heuristico_fallback(
     elif "atestado" in texto_lower:
         tipo_doc = TipoDocumento.ATESTADO.value
         especialidade = "Clínica Médica"
-    elif not texto_limpo or tem_ilegibilidade or not (
-        paciente.nome or medico.crm or "conclusão:" in texto_lower or "conclusao:" in texto_lower
-    ):
+    else:
+        # Nenhum tipo clínico reconhecido (texto vazio, ilegível ou não clínico): o modo sem IA não
+        # inventa um tipo nem dados. Sai como não identificado, com score 0.0, para a revisão humana.
         return (
             ClassificacaoDocumento(
                 tipo_documento=TipoDocumento.OUTRO_DESCONHECIDO.value,
@@ -237,9 +237,6 @@ def extrair_dados_heuristico_fallback(
             ),
             DadosExtraidos(),
         )
-    else:
-        tipo_doc = TipoDocumento.LAUDO_EXAME_LABORATORIAL.value
-        especialidade = "Geral"
 
     # Identificação de exame realizado
     exame_realizado: Optional[str] = None
