@@ -9,10 +9,13 @@ Mapeamento: agente/visao_multimodal.py
 import logging
 import os
 import re
+import time
 from typing import Optional, Tuple
 
+import httpx
 from dotenv import load_dotenv
 from google import genai
+from google.genai import errors as erros_genai
 from google.genai import types
 
 from agente.leitor_documentos import ConteudoDocumentoIngerido
@@ -47,6 +50,55 @@ def resolver_modelo(valor_do_ambiente: Optional[str]) -> str:
 
 
 MODELO_GEMINI_PADRAO = resolver_modelo(os.getenv("LLM_MODEL"))
+
+# Falha transitória (modelo sob alta demanda, rede lenta): a chamada é repetida. A original mais
+# 2 novas tentativas, com espera de 2 e 4 segundos. 429 (cota) e os demais erros 4xx não são
+# repetidos: repetir não resolve e gasta a cota. Depois da última falha, vale o fallback.
+TENTATIVAS_MAXIMAS = 3
+ESPERAS_ENTRE_TENTATIVAS_SEGUNDOS = (2, 4)
+CODIGOS_HTTP_TRANSITORIOS = frozenset({500, 503, 504})
+# Sem prazo, uma conexão presa nunca vira "timeout" e a nova tentativa nunca acontece. No pior caso,
+# 3 chamadas de 25 s mais as esperas somam 81 s: cabe nos 90 s que o painel espera pela API.
+TIMEOUT_CHAMADA_MS = 25_000
+
+
+def _dormir(segundos: float) -> None:
+    time.sleep(segundos)
+
+
+def _falha_transitoria(erro: Exception) -> bool:
+    if isinstance(erro, erros_genai.APIError):
+        return erro.code in CODIGOS_HTTP_TRANSITORIOS
+    return isinstance(erro, httpx.TimeoutException)
+
+
+def _descrever_falha(erro: Exception) -> str:
+    """O tipo da exceção e, quando houver, o código HTTP. Nunca a mensagem: num ValidationError
+    da resposta, ela traz trechos do que o modelo devolveu, ou seja, dados do paciente."""
+    codigo = getattr(erro, "code", None)
+    if isinstance(codigo, int):
+        return f"{type(erro).__name__}, HTTP {codigo}"
+    return type(erro).__name__
+
+
+def _gerar_conteudo_com_tentativas(cliente, modelo: str, conteudos: list, configuracao: types.GenerateContentConfig):
+    """Chama o modelo e repete a chamada em falha transitória. Relança a última falha."""
+    for tentativa in range(1, TENTATIVAS_MAXIMAS + 1):
+        try:
+            return cliente.models.generate_content(model=modelo, contents=conteudos, config=configuracao)
+        except Exception as erro:
+            if tentativa == TENTATIVAS_MAXIMAS or not _falha_transitoria(erro):
+                raise
+            espera = ESPERAS_ENTRE_TENTATIVAS_SEGUNDOS[tentativa - 1]
+            logger.warning(
+                "Falha transitória na chamada ao modelo Gemini %s (%s). Nova tentativa %d de %d em %d s.",
+                modelo,
+                _descrever_falha(erro),
+                tentativa + 1,
+                TENTATIVAS_MAXIMAS,
+                espera,
+            )
+            _dormir(espera)
 
 
 def obter_chave_llm() -> Optional[str]:
@@ -298,7 +350,7 @@ def analisar_documento_com_gemini(
 
     if api_key:
         try:
-            cliente = genai.Client(api_key=api_key)
+            cliente = genai.Client(api_key=api_key, http_options=types.HttpOptions(timeout=TIMEOUT_CHAMADA_MS))
             partes_conteudo = []
 
             if conteudo.requer_visao_multimodal and conteudo.bytes_midia:
@@ -315,10 +367,11 @@ def analisar_documento_com_gemini(
             else:
                 partes_conteudo.append(montar_prompt_extracao_texto(texto_atual, canal_origem))
 
-            resposta = cliente.models.generate_content(
-                model=modelo,
-                contents=partes_conteudo,
-                config=types.GenerateContentConfig(
+            resposta = _gerar_conteudo_com_tentativas(
+                cliente,
+                modelo,
+                partes_conteudo,
+                types.GenerateContentConfig(
                     system_instruction=SYSTEM_PROMPT_MEDIFLOW,
                     temperature=0.1,
                     response_mime_type="application/json",
@@ -343,11 +396,11 @@ def analisar_documento_com_gemini(
                     texto_final,
                 )
         except Exception as exc:
+            # Só o modelo, o tipo da exceção e o código HTTP: a mensagem completa pode trazer dados do paciente.
             logger.warning(
-                "Falha na chamada ao modelo Gemini %s (%s: %s). Ativando fallback clínico determinístico.",
+                "Falha na chamada ao modelo Gemini %s (%s). Ativando fallback clínico determinístico.",
                 modelo,
-                type(exc).__name__,
-                exc,
+                _descrever_falha(exc),
             )
 
     classificacao, dados = extrair_dados_heuristico_fallback(

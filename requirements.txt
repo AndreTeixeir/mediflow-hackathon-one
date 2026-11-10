@@ -27,7 +27,8 @@ pytest==9.1.1
 # API
 fastapi==0.162.0
 uvicorn==0.54.0
-# httpx é exigido pelo fastapi.testclient.TestClient (testes da API)
+# httpx: o agente (agente/visao_multimodal.py) identifica o timeout de rede do SDK do Gemini por ele,
+# e o fastapi.testclient.TestClient (testes da API) o exige
 httpx==0.28.1
 
 # OCI
