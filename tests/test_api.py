@@ -606,7 +606,7 @@ def test_falha_no_destino_e_na_compensacao_continua_503_e_registra_log_seguro(
     assert (tmp_path / "mediflow-recebidos" / f"{documento_id}.json").exists()
 
 
-@pytest.mark.parametrize("alvo", ["analisar_documento", "executar_roteamento_clinico", "TriagemResposta"])
+@pytest.mark.parametrize("alvo", ["executar_triagem_mediflow", "TriagemResposta"])
 def test_excecao_inesperada_da_500_sem_detalhes_e_desfaz_a_entrada(
     cliente_instrumentado, repo_instrumentado, tmp_path, monkeypatch, alvo
 ):
@@ -628,6 +628,13 @@ def test_excecao_inesperada_da_500_sem_detalhes_e_desfaz_a_entrada(
     assert repo_instrumentado.chamadas_apagar == [("mediflow-recebidos", f"{documento_id}.json")]
 
 
+def test_a_api_so_conhece_o_grafo_e_nao_tem_mais_o_agente_simulado():
+    assert not (PASTA_DADOS.parent / "api" / "agente_simulado.py").exists()
+    assert not hasattr(modulo_triagem, "analisar_documento")
+    assert not hasattr(modulo_triagem, "executar_roteamento_clinico")
+    assert modulo_triagem.executar_triagem_mediflow.__module__ == "agente.grafo"
+
+
 def test_excecao_inesperada_com_compensacao_falhando_relanca_a_original(
     cliente_instrumentado, repo_instrumentado, tmp_path, monkeypatch, caplog
 ):
@@ -638,7 +645,7 @@ def test_excecao_inesperada_com_compensacao_falhando_relanca_a_original(
     def quebrar(*args, **kwargs):
         raise RuntimeError("segredo interno do bug")
 
-    monkeypatch.setattr(modulo_triagem, "analisar_documento", quebrar)
+    monkeypatch.setattr(modulo_triagem, "executar_triagem_mediflow", quebrar)
 
     with caplog.at_level(logging.ERROR, logger="mediflow.api.triagem"):
         resposta = cliente_instrumentado.post("/api/v1/triagem", json=entrada)

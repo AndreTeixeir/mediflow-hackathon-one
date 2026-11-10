@@ -311,9 +311,9 @@ def analisar_documento(
     entrada: DocumentoEntrada,
 ) -> Tuple[ClassificacaoDocumento, DadosExtraidos]:
     """
-    Interface compatível com a assinatura de `api/agente_simulado.py`:
-    Recebe `DocumentoEntrada`, executa ingestão multimodal + extração e devolve
-    `(ClassificacaoDocumento, DadosExtraidos)`.
+    Versão enxuta do pipeline, sem as regras de roteamento: recebe `DocumentoEntrada`, executa
+    ingestão multimodal + extração e devolve `(ClassificacaoDocumento, DadosExtraidos)`.
+    A API não a usa: ela chama `executar_triagem_mediflow`, que roda o grafo inteiro.
     """
     conteudo = ingerir_documento_clinico(entrada)
     classificacao, dados, _ = analisar_documento_com_gemini(
