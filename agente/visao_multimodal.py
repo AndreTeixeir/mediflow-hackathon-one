@@ -34,6 +34,7 @@ from prompts.extracao_clinica import (
     SYSTEM_PROMPT_MEDIFLOW,
     montar_prompt_extracao_texto,
 )
+from regras.regras_clinicas import UFS_VALIDAS
 
 load_dotenv()
 
@@ -141,8 +142,22 @@ def _extrair_paciente_heuristico(texto: str) -> Paciente:
     return Paciente(nome=nome, idade=idade)
 
 
+# CRM-SP 123456, CRM/SP 123456, CRM 123456-SP, CRM 123456/SP ou CRM 123456 (sem UF).
+_PADRAO_CRM = re.compile(
+    r"\bCRM\s*[-/]?\s*(?:([A-Z]{2})\b)?\s*[:\-]?\s*(\d{3,8})(?:\s*[-/]\s*([A-Z]{2})\b)?",
+    flags=re.IGNORECASE,
+)
+
+
+def _formatar_crm(encontrado: re.Match) -> str:
+    """NUMERO-UF quando o texto traz uma UF válida; só NUMERO quando não traz. Nunca presume a UF."""
+    uf_antes, numero, uf_depois = encontrado.groups()
+    uf = next((u.upper() for u in (uf_antes, uf_depois) if u and u.upper() in UFS_VALIDAS), None)
+    return f"{numero}-{uf}" if uf else numero
+
+
 def _extrair_medico_heuristico(texto: str) -> MedicoSolicitante:
-    """Extrai nome do médico e CRM padronizado no formato NUMERO-UF."""
+    """Extrai nome do médico e CRM no formato NUMERO-UF (só NUMERO se o texto não trouxer a UF)."""
     nome_med: Optional[str] = None
     crm_fmt: Optional[str] = None
 
@@ -153,11 +168,9 @@ def _extrair_medico_heuristico(texto: str) -> MedicoSolicitante:
     )
     if match_med:
         trecho_med = match_med.group(1).strip(" .")
-        match_crm = re.search(r"CRM(?:-|\s*)([A-Z]{2})?\s*[:\-]?\s*(\d{3,8})(?:-([A-Z]{2}))?", trecho_med, flags=re.IGNORECASE)
+        match_crm = _PADRAO_CRM.search(trecho_med)
         if match_crm:
-            uf = (match_crm.group(1) or match_crm.group(3) or "SP").upper()
-            num = match_crm.group(2)
-            crm_fmt = f"{num}-{uf}"
+            crm_fmt = _formatar_crm(match_crm)
             nome_med = trecho_med[: match_crm.start()].strip(" -.,")
         else:
             if any(termo in trecho_med.lower() for termo in ["ilegível", "rasurado", "borrado"]):
@@ -167,11 +180,9 @@ def _extrair_medico_heuristico(texto: str) -> MedicoSolicitante:
                 nome_med = trecho_med.strip(" .,-")
 
     if not crm_fmt:
-        match_crm_global = re.search(r"CRM(?:-|\s*)([A-Z]{2})?\s*[:\-]?\s*(\d{3,8})(?:-([A-Z]{2}))?", texto, flags=re.IGNORECASE)
+        match_crm_global = _PADRAO_CRM.search(texto)
         if match_crm_global:
-            uf = (match_crm_global.group(1) or match_crm_global.group(3) or "SP").upper()
-            num = match_crm_global.group(2)
-            crm_fmt = f"{num}-{uf}"
+            crm_fmt = _formatar_crm(match_crm_global)
 
     return MedicoSolicitante(nome=nome_med, crm=crm_fmt)
 

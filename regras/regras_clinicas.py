@@ -28,6 +28,12 @@ TERMOS_URGENCIA_CRITICA = [
     "insuficiencia respiratoria aguda", "pneumotorax hipertensivo"
 ]
 
+# As 27 unidades da federação: a UF de um CRM só vale se for uma destas.
+UFS_VALIDAS = frozenset({
+    "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA",
+    "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO",
+})
+
 TERMOS_PRIORITARIOS = [
     "urgente", "emergencia", "prioritario", "critico", "gravidade",
     "correlacao clinica urgente", "encaminhamento imediato"
