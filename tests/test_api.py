@@ -160,6 +160,34 @@ def test_cenario_auditoria_exige_revisao_humana(cliente):
     assert corpo["decisao_roteamento"]["notificacao_gerada"] is None
 
 
+LAUDO_SEM_CRM = (
+    "LABORATORIO CENTRAL - LAUDO DE EXAME LABORATORIAL.\n"
+    "Paciente: Mariana Alcantara de Souza, 34 anos.\n"
+    "Solicitante: Dr. Roberto Viana.\n"
+    "Exame: Hemograma completo.\n"
+    "CONCLUSÃO: Parâmetros dentro dos limites da normalidade."
+)
+
+
+def entradas_para_conferir_status():
+    """Os 3 cenários oficiais e o laudo sem CRM (o caso que saía com status e destino trocados)."""
+    entradas = [carregar_cenario(pasta)["requisicao_entrada"] for pasta, *_ in CENARIOS]
+    entradas.append({"documento_id": "DOC-LAUDO-SEM-CRM", "documento_texto": LAUDO_SEM_CRM, "canal_origem": "Ambulatorio"})
+    return entradas
+
+
+@pytest.mark.parametrize("entrada", entradas_para_conferir_status(), ids=lambda e: e["documento_id"])
+def test_status_destino_e_bucket_andam_juntos(cliente, entrada):
+    corpo = cliente.post("/api/v1/triagem", json=entrada).json()
+
+    em_revisao = corpo["decisao_roteamento"]["destino_principal"] == "Fila_Revisao_Humana"
+    assert (corpo["status"] == "pendente_auditoria") == em_revisao
+    assert (corpo["armazenamento_oci"]["bucket"] == "mediflow-auditoria-humana") == em_revisao
+    assert corpo["decisao_roteamento"]["requer_auditoria_humana"] == em_revisao
+    if not em_revisao:
+        assert corpo["status"] == "processado"
+
+
 def test_texto_com_espacos_e_quebras_diferentes_ainda_e_reconhecido(cliente):
     entrada = dict(carregar_cenario("2_urgencia")["requisicao_entrada"])
     entrada["documento_id"] = "DOC-ESPACOS"

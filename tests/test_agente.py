@@ -11,12 +11,14 @@ import base64
 import io
 import json
 import os
+import re
 import unittest
 
 from PIL import Image
 from pypdf import PdfWriter
 
 from agente import analisar_documento, executar_triagem_mediflow, ingerir_documento_clinico
+from agente.grafo import status_para_destino
 from agente.visao_multimodal import obter_chave_llm
 from contratos.modelos import (
     DestinoRoteamento,
@@ -24,6 +26,15 @@ from contratos.modelos import (
     NivelPrioridade,
     StatusProcessamento,
     TipoDocumento,
+)
+
+# Laudo sem CRM: a classificação do modo sem IA é 0.98 e a única penalidade é a do CRM (-0.15).
+LAUDO_SEM_CRM = (
+    "LABORATORIO CENTRAL - LAUDO DE EXAME LABORATORIAL.\n"
+    "Paciente: Mariana Alcantara de Souza, 34 anos.\n"
+    "Solicitante: Dr. Roberto Viana.\n"
+    "Exame: Hemograma completo.\n"
+    "CONCLUSÃO: Parâmetros dentro dos limites da normalidade."
 )
 
 
@@ -116,6 +127,56 @@ class TestAgenteMediFlowLangGraph(unittest.TestCase):
         self.assertEqual(resposta.decisao_roteamento.destino_principal, DestinoRoteamento.FARMACIA_HOSPITALAR)
         self.assertFalse(resposta.decisao_roteamento.requer_auditoria_humana)
         self.assertIsNone(resposta.armazenamento_oci)
+
+    def test_status_acompanha_o_destino_nos_tres_cenarios(self):
+        """Fila_Revisao_Humana implica pendente_auditoria; os outros destinos, processado."""
+        esperado = {
+            "1_rotina": (StatusProcessamento.PROCESSADO, DestinoRoteamento.PRONTUARIO_ELETRONICO),
+            "2_urgencia": (StatusProcessamento.PROCESSADO, DestinoRoteamento.FILA_EMERGENCIA),
+            "3_auditoria_humana": (StatusProcessamento.PENDENTE_AUDITORIA, DestinoRoteamento.FILA_REVISAO_HUMANA),
+        }
+        for pasta, (status, destino) in esperado.items():
+            with self.subTest(cenario=pasta):
+                entrada = DocumentoEntrada(**self._carregar_cenario(pasta)["requisicao_entrada"])
+
+                resposta = executar_triagem_mediflow(entrada)
+
+                self.assertEqual(resposta.decisao_roteamento.destino_principal, destino)
+                self.assertEqual(resposta.status, status)
+                em_revisao = destino == DestinoRoteamento.FILA_REVISAO_HUMANA
+                self.assertEqual(resposta.status == StatusProcessamento.PENDENTE_AUDITORIA, em_revisao)
+                self.assertEqual(resposta.decisao_roteamento.requer_auditoria_humana, em_revisao)
+
+    def test_status_para_destino_so_marca_pendente_a_fila_de_revisao_humana(self):
+        for destino in DestinoRoteamento:
+            with self.subTest(destino=destino.value):
+                esperado = (
+                    StatusProcessamento.PENDENTE_AUDITORIA
+                    if destino == DestinoRoteamento.FILA_REVISAO_HUMANA
+                    else StatusProcessamento.PROCESSADO
+                )
+                self.assertEqual(status_para_destino(destino), esperado)
+
+    def test_penalidade_de_consistencia_e_aplicada_uma_so_vez(self):
+        """Laudo sem CRM: o score da classificação e o citado na justificativa são o mesmo (0.83, não 0.68)."""
+        entrada = DocumentoEntrada(documento_id="DOC-LAUDO-SEM-CRM", documento_texto=LAUDO_SEM_CRM, canal_origem="Ambulatorio")
+
+        # Um limiar alto leva o laudo para a revisão humana, cuja justificativa cita o score.
+        resposta = executar_triagem_mediflow(entrada, limiar_auditoria_humana=0.90)
+
+        self.assertEqual(resposta.classificacao.score_confianca_classificacao, 0.83)
+        self.assertIn("(0.83)", resposta.decisao_roteamento.justificativa_roteamento)
+        self.assertNotIn("0.68", resposta.decisao_roteamento.justificativa_roteamento)
+        self.assertEqual(resposta.status, StatusProcessamento.PENDENTE_AUDITORIA)
+
+    def test_score_citado_na_justificativa_e_o_da_classificacao_no_cenario_3(self):
+        entrada = DocumentoEntrada(**self._carregar_cenario("3_auditoria_humana")["requisicao_entrada"])
+
+        resposta = executar_triagem_mediflow(entrada)
+
+        citado = re.search(r"\((\d\.\d\d)\)", resposta.decisao_roteamento.justificativa_roteamento)
+        self.assertIsNotNone(citado)
+        self.assertEqual(citado.group(1), f"{resposta.classificacao.score_confianca_classificacao:.2f}")
 
     def test_interface_analisar_documento_compativel_api(self):
         """Valida a assinatura analisar_documento(entrada) -> (ClassificacaoDocumento, DadosExtraidos)."""
