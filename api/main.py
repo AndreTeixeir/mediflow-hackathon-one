@@ -7,21 +7,17 @@ Execução (a partir da raiz): python -m uvicorn api.main:app --reload
 """
 
 import logging
-from functools import lru_cache
 
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
+from api.auditoria import router as roteador_da_auditoria
+from api.dependencias import obter_repositorio
 from api.triagem import processar_triagem
 from api.validacao import validar_entrada
-from armazenamento.repositorio import (
-    FalhaArmazenamento,
-    ObjetoJaExiste,
-    RepositorioDocumentos,
-    criar_repositorio,
-)
+from armazenamento.repositorio import FalhaArmazenamento, ObjetoJaExiste, RepositorioDocumentos
 from contratos.modelos import DocumentoEntrada, TriagemResposta
 
 load_dotenv()
@@ -29,12 +25,7 @@ load_dotenv()
 logger = logging.getLogger("mediflow.api")
 
 app = FastAPI(title="MediFlow API", version="0.1.0")
-
-
-@lru_cache(maxsize=1)
-def obter_repositorio() -> RepositorioDocumentos:
-    """Criado uma vez, no primeiro uso. Os testes o substituem com app.dependency_overrides."""
-    return criar_repositorio()
+app.include_router(roteador_da_auditoria)
 
 
 @app.exception_handler(RequestValidationError)

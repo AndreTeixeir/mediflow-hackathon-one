@@ -35,6 +35,11 @@ class FalhaArmazenamento(Exception):
     """Falha ao gravar, ler, listar ou apagar. A mensagem nunca contém credenciais, OCIDs nem o erro original."""
 
 
+class ObjetoIlegivel(FalhaArmazenamento):
+    """O objeto existe, mas o conteúdo não é um objeto JSON. Diferente de uma falha do serviço: quem lista
+    pode pular este objeto sem esconder um problema de infraestrutura."""
+
+
 class ObjetoNaoEncontrado(Exception):
     """O objeto não existe no bucket (ou na pasta local)."""
 
@@ -90,9 +95,9 @@ def _desserializar(corpo: bytes) -> dict:
     try:
         conteudo = json.loads(corpo.decode("utf-8"))
     except (UnicodeDecodeError, ValueError):
-        raise FalhaArmazenamento("Objeto com conteúdo que não é um JSON válido.") from None
+        raise ObjetoIlegivel("Objeto com conteúdo que não é um JSON válido.") from None
     if not isinstance(conteudo, dict):
-        raise FalhaArmazenamento("Objeto com conteúdo que não é um objeto JSON.")
+        raise ObjetoIlegivel("Objeto com conteúdo que não é um objeto JSON.")
     return conteudo
 
 

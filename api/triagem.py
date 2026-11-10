@@ -27,7 +27,7 @@ from contratos.modelos import (
 logger = logging.getLogger("mediflow.api.triagem")
 
 
-def _bucket_destino(destino: DestinoRoteamento, buckets: NomesBuckets) -> str:
+def bucket_do_destino(destino: DestinoRoteamento, buckets: NomesBuckets) -> str:
     por_destino = {
         DestinoRoteamento.FILA_EMERGENCIA: buckets.urgentes,
         DestinoRoteamento.FILA_REVISAO_HUMANA: buckets.auditoria_humana,
@@ -48,7 +48,7 @@ def _montar_resposta(entrada: DocumentoEntrada, buckets: NomesBuckets, nome_obje
     decisao = resposta_grafo.decisao_roteamento
     status = resposta_grafo.status
 
-    bucket_destino = _bucket_destino(decisao.destino_principal, buckets)
+    bucket_destino = bucket_do_destino(decisao.destino_principal, buckets)
 
     # status_backup="sucesso" só vale porque processar_triagem grava a resposta logo em
     # seguida e deixa a exceção subir se falhar: a resposta nunca sai afirmando um backup

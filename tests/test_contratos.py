@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 import pytest
 from pydantic import ValidationError
 
-from api.triagem import _bucket_destino
+from api.triagem import bucket_do_destino
 from armazenamento.repositorio import obter_buckets
 from contratos import modelos
 from contratos.modelos import (
@@ -105,11 +105,11 @@ def test_os_outros_enums_nao_ganharam_membros():
 
 @pytest.mark.parametrize("destino", list(DestinoRoteamento))
 def test_todo_destino_tem_bucket(destino):
-    assert _bucket_destino(destino, obter_buckets())
+    assert bucket_do_destino(destino, obter_buckets())
 
 
 def test_o_destino_rejeitado_vai_para_o_bucket_de_rejeitados():
-    assert _bucket_destino(DestinoRoteamento.DOCUMENTO_REJEITADO, obter_buckets()) == "mediflow-rejeitados"
+    assert bucket_do_destino(DestinoRoteamento.DOCUMENTO_REJEITADO, obter_buckets()) == "mediflow-rejeitados"
 
 
 # ============================================================================

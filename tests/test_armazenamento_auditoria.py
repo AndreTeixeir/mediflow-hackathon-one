@@ -20,6 +20,7 @@ import pytest
 from armazenamento.repositorio import (
     FalhaArmazenamento,
     InfoObjeto,
+    ObjetoIlegivel,
     ObjetoJaExiste,
     ObjetoNaoEncontrado,
     RepositorioLocal,
@@ -159,9 +160,10 @@ def test_local_ler_json_que_nao_e_um_objeto_json_vira_falha_sem_vazar_o_conteudo
     (tmp_path / ORIGEM).mkdir()
     (tmp_path / ORIGEM / "DOC-1.json").write_bytes(corpo)
 
-    with pytest.raises(FalhaArmazenamento) as capturada:
+    with pytest.raises(ObjetoIlegivel) as capturada:
         local.ler_json(ORIGEM, "DOC-1.json")
 
+    assert isinstance(capturada.value, FalhaArmazenamento)  # quem já tratava a falha continua tratando
     assert "SEGREDO" not in str(capturada.value)
 
 
@@ -352,7 +354,7 @@ def test_oci_ler_json_com_erro_vira_falha_sem_vazar_o_texto_original(cliente_oci
 def test_oci_ler_json_que_nao_e_um_objeto_json_vira_falha_sem_vazar_o_conteudo(cliente_oci, oci_repo, corpo):
     cliente_oci.objetos[(ORIGEM, "DOC-1.json")] = (corpo, datetime(2026, 11, 10, tzinfo=timezone.utc))
 
-    with pytest.raises(FalhaArmazenamento) as capturada:
+    with pytest.raises(ObjetoIlegivel) as capturada:
         oci_repo.ler_json(ORIGEM, "DOC-1.json")
 
     assert "SEGREDO" not in str(capturada.value)

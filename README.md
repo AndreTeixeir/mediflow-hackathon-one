@@ -150,8 +150,17 @@ Todas as variáveis estão comentadas no `.env.example`.
 |--------|------|-----------|
 | `GET` | `/api/v1/saude` | Responde `{"status": "ok", "armazenamento": "local"}` (ou `"oci"`) |
 | `POST` | `/api/v1/triagem` | Recebe um `DocumentoEntrada` e devolve a `TriagemResposta` |
+| `GET` | `/api/v1/auditoria/pendentes` | A fila de revisão humana (bucket `mediflow-auditoria-humana`): `documento_id`, tipo, prioridade, score, justificativa, dados extraídos e data. Do que espera há mais tempo para o mais novo, até 200 |
+| `POST` | `/api/v1/auditoria/{documento_id}/decisao` | A decisão de quem revisa: `{"destino": "rotina" \| "urgente" \| "rejeitado", "revisor": "...", "justificativa": "..."}` |
+| `GET` | `/api/v1/documentos` | O histórico dos buckets de rotina, urgentes, auditoria humana e rejeitados, do mais novo, até 200 |
 
-Respostas de erro da triagem: `422` (`documento_id` fora do padrão `[A-Za-z0-9-]{1,64}`, ou sem `documento_texto` e sem `documento_base64`), `409` (`documento_id` já recebido) e `503` (falha ao gravar no armazenamento).
+Respostas de erro da triagem: `422` (`documento_id` fora do padrão `[A-Za-z0-9-]{1,64}`, sem `documento_texto` e sem `documento_base64`, `tipo_arquivo` fora de PDF/PNG/JPG/JPEG/WEBP/TXT, Base64 inválido, ou PDF/imagem que não abre; um corpo que não é JSON também dá `422`, sem repetir o que foi enviado), `409` (`documento_id` já recebido) e `503` (falha ao gravar no armazenamento).
+
+#### Auditoria humana
+
+A decisão move o documento de `mediflow-auditoria-humana` para `mediflow-rotina` (o destino segue o tipo do documento: farmácia, auditoria de autorizações ou prontuário), `mediflow-urgentes` (`Fila_Emergencia_Medica`, com o alerta ao plantão) ou `mediflow-rejeitados` (`Documento_Rejeitado`, status `rejeitado`). O JSON ganha o campo `auditoria_humana`, com quem decidiu, quando (UTC), o quê e por quê, **e também o destino e a justificativa que o grafo tinha decidido**, para a trilha mostrar o que a IA decidiu e o que a pessoa mudou.
+
+Erros da decisão: `404` (o documento não está pendente, inclusive se já foi decidido), `409` (o documento já existe no bucket de destino), `422` (`destino` fora de `rotina`/`urgente`/`rejeitado`, `revisor` vazio ou com mais de 80 caracteres, `justificativa` com menos de 5 ou mais de 500, ou `documento_id` fora do padrão) e `503` (falha no armazenamento).
 
 A rota `POST /api/v1/triagem` aciona o Grafo de Decisão no LangGraph (`agente/grafo.py`), que realiza a leitura multimodal (texto, PDF digital/digitalizado ou imagem em Base64), classifica e extrai os dados clínicos via **Google Gemini (`gemini-3.5-flash-lite`, ajustável em `LLM_MODEL`)** (ou via motor determinístico local de fallback quando `LLM_API_KEY` está vazio) e aplica as regras clínicas de validação e roteamento.
 
