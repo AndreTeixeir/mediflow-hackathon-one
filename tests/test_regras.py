@@ -27,9 +27,11 @@ from contratos.modelos import (
 from regras.regras_clinicas import (
     NivelUrgencia,
     classificar_nivel_urgencia,
+    UFS_VALIDAS,
     detectar_urgencia_clinica,
     executar_roteamento_clinico,
     normalizar_texto,
+    validar_crm,
 )
 
 class TestMediFlowCenarios(unittest.TestCase):
@@ -303,6 +305,129 @@ def test_prioritario_e_score_baixo_citam_os_dois_motivos():
     assert decisao.destino_principal == DestinoRoteamento.FILA_REVISAO_HUMANA
     assert "'emergencia'" in decisao.justificativa_roteamento
     assert "Score de confiança baixo (0.40)" in decisao.justificativa_roteamento
+
+
+# ============================================================================
+# CRM: número de 4 a 6 dígitos com UF válida
+# ============================================================================
+
+@pytest.mark.parametrize(
+    "crm",
+    [
+        "145892-SP", "145892/SP", "CRM-SP 145892", "CRM/SP 145892",  # os quatro formatos
+        "1234-RJ", "123456-MG",  # 4 e 6 dígitos
+        "145892-sp", "  145892-SP  ", "CRM-SP   145892", "crm/sp 145892",  # caixa e espaços
+    ],
+)
+def test_crm_valido(crm):
+    assert validar_crm(crm) == (True, "CRM Válido")
+
+
+@pytest.mark.parametrize("uf", sorted(UFS_VALIDAS))
+def test_as_27_ufs_sao_validas(uf):
+    assert validar_crm(f"145892-{uf}")[0] is True
+    assert validar_crm(f"CRM/{uf} 145892")[0] is True
+
+
+@pytest.mark.parametrize(
+    "crm",
+    [
+        "123", "telefone 3333-4444",  # os casos da especificação
+        "112233",  # só o número: sem UF
+        "145892-XX", "145892/ZZ", "CRM-XX 145892",  # UF que não existe
+        "123-SP", "12345-S", "1234567-SP", "12345678-SP",  # menos de 4 ou mais de 6 dígitos
+        "SP 145892", "CRM 145892-SP", "145892 SP", "145892-SP-1", "ABCDEF-SP",  # fora dos 4 formatos
+        "(11) 98888-7777",
+    ],
+)
+def test_crm_invalido(crm):
+    valido, motivo = validar_crm(crm)
+
+    assert valido is False
+    assert "inválido" in motivo and crm in motivo
+
+
+@pytest.mark.parametrize("crm", [None, "", "   "])
+def test_crm_ausente(crm):
+    assert validar_crm(crm) == (False, "CRM não informado ou vazio")
+
+
+def test_motivo_do_crm_invalido_nao_repete_um_texto_gigante():
+    valido, motivo = validar_crm("X" * 500)
+
+    assert valido is False
+    assert len(motivo) < 100
+
+
+# --- CRM ausente ou inválido manda sempre para a revisão humana --------------------------
+
+@pytest.mark.parametrize("crm", [None, "", "123", "112233", "145892-XX", "telefone 3333-4444"])
+def test_crm_ausente_ou_invalido_vai_para_revisao_humana_mesmo_com_score_alto(crm):
+    dados = dados_completos(medico_solicitante=MedicoSolicitante(nome="Dra. Clara Ficticia", crm=crm))
+    classificacao = classificacao_de_rotina(score=0.99)
+
+    decisao = executar_roteamento_clinico(classificacao, dados, "Hemograma normal. PCR: 3,2 mg/L.")
+
+    assert decisao.destino_principal == DestinoRoteamento.FILA_REVISAO_HUMANA
+    assert decisao.requer_auditoria_humana is True
+    assert decisao.notificacao_gerada is None
+    assert "CRM do médico ausente ou inválido" in decisao.justificativa_roteamento
+
+
+def test_sem_medico_solicitante_tambem_vai_para_revisao_humana():
+    decisao = executar_roteamento_clinico(
+        classificacao_de_rotina(score=0.99), dados_completos(medico_solicitante=None), "Hemograma normal."
+    )
+
+    assert decisao.destino_principal == DestinoRoteamento.FILA_REVISAO_HUMANA
+    assert "CRM do médico ausente ou inválido" in decisao.justificativa_roteamento
+
+
+def test_crm_valido_nao_muda_o_roteamento():
+    decisao = executar_roteamento_clinico(classificacao_de_rotina(), dados_completos(), "Hemograma normal.")
+
+    assert decisao.destino_principal == DestinoRoteamento.PRONTUARIO_ELETRONICO
+
+
+def test_critico_sem_crm_continua_na_emergencia_e_avisa_do_crm():
+    dados = dados_completos(medico_solicitante=MedicoSolicitante(nome="Dra. Clara Ficticia", crm=None))
+
+    decisao = executar_roteamento_clinico(classificacao_de_rotina(), dados, "Paciente com choque séptico.", "Internacao")
+
+    assert decisao.destino_principal == DestinoRoteamento.FILA_EMERGENCIA
+    assert decisao.requer_auditoria_humana is False
+    assert "CRM do médico ausente ou inválido" in decisao.justificativa_roteamento
+    assert decisao.notificacao_gerada.canal == "Alerta_Plantao_Medico"
+    assert "CRM do médico ausente ou inválido" in decisao.notificacao_gerada.mensagem
+
+
+def test_critico_com_crm_valido_nao_leva_aviso_de_crm():
+    decisao = executar_roteamento_clinico(classificacao_de_rotina(), dados_completos(), "Paciente com choque séptico.")
+
+    assert "CRM" not in decisao.justificativa_roteamento
+    assert "CRM" not in decisao.notificacao_gerada.mensagem
+
+
+def test_prioritario_sem_crm_cita_os_dois_motivos():
+    dados = dados_completos(medico_solicitante=MedicoSolicitante(nome="Dra. Clara Ficticia", crm="123"))
+
+    decisao = executar_roteamento_clinico(classificacao_de_rotina(), dados, "Paciente em situação de emergência.")
+
+    assert decisao.destino_principal == DestinoRoteamento.FILA_REVISAO_HUMANA
+    assert "CRM do médico ausente ou inválido" in decisao.justificativa_roteamento
+    assert "'emergencia'" in decisao.justificativa_roteamento
+
+
+def test_crm_e_score_baixo_citam_os_dois_motivos_sem_repetir_o_crm():
+    dados = dados_completos(medico_solicitante=MedicoSolicitante(nome="Dra. Clara Ficticia", crm=None))
+
+    decisao = executar_roteamento_clinico(classificacao_de_rotina(score=0.40), dados, "Hemograma normal.")
+
+    justificativa = decisao.justificativa_roteamento
+    assert "CRM do médico ausente ou inválido" in justificativa
+    assert "Score de confiança baixo (0.25)" in justificativa
+    assert justificativa.count("CRM não informado ou vazio") == 1
+
 
 
 # --- O grafo aplica o nível de prioridade a partir da função, não da justificativa ---------

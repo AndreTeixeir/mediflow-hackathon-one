@@ -188,6 +188,19 @@ def test_status_destino_e_bucket_andam_juntos(cliente, entrada):
         assert corpo["status"] == "processado"
 
 
+def test_laudo_sem_crm_vai_para_a_auditoria_com_status_pendente(cliente, tmp_path):
+    entrada = {"documento_id": "DOC-LAUDO-SEM-CRM", "documento_texto": LAUDO_SEM_CRM, "canal_origem": "Ambulatorio"}
+
+    corpo = cliente.post("/api/v1/triagem", json=entrada).json()
+
+    assert corpo["status"] == "pendente_auditoria"
+    assert corpo["decisao_roteamento"]["destino_principal"] == "Fila_Revisao_Humana"
+    assert corpo["armazenamento_oci"]["bucket"] == "mediflow-auditoria-humana"
+    assert corpo["classificacao"]["score_confianca_classificacao"] == 0.83
+    assert "CRM do médico ausente ou inválido" in corpo["decisao_roteamento"]["justificativa_roteamento"]
+    assert (tmp_path / "mediflow-auditoria-humana" / "DOC-LAUDO-SEM-CRM.json").exists()
+
+
 def test_texto_com_espacos_e_quebras_diferentes_ainda_e_reconhecido(cliente):
     entrada = dict(carregar_cenario("2_urgencia")["requisicao_entrada"])
     entrada["documento_id"] = "DOC-ESPACOS"

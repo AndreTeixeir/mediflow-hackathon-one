@@ -169,6 +169,18 @@ class TestAgenteMediFlowLangGraph(unittest.TestCase):
         self.assertNotIn("0.68", resposta.decisao_roteamento.justificativa_roteamento)
         self.assertEqual(resposta.status, StatusProcessamento.PENDENTE_AUDITORIA)
 
+    def test_laudo_sem_crm_vai_para_revisao_humana_com_o_mesmo_score_e_o_motivo(self):
+        """O laudo do 3.5 saía processado com Fila_Revisao_Humana, 0.83 e 0.68. Agora: pendente, 0.83 e o CRM como motivo."""
+        entrada = DocumentoEntrada(documento_id="DOC-LAUDO-SEM-CRM", documento_texto=LAUDO_SEM_CRM, canal_origem="Ambulatorio")
+
+        resposta = executar_triagem_mediflow(entrada)
+
+        self.assertEqual(resposta.status, StatusProcessamento.PENDENTE_AUDITORIA)
+        self.assertEqual(resposta.decisao_roteamento.destino_principal, DestinoRoteamento.FILA_REVISAO_HUMANA)
+        self.assertEqual(resposta.classificacao.score_confianca_classificacao, 0.83)
+        self.assertIn("CRM do médico ausente ou inválido", resposta.decisao_roteamento.justificativa_roteamento)
+        self.assertNotIn("0.68", resposta.decisao_roteamento.justificativa_roteamento)
+
     def test_score_citado_na_justificativa_e_o_da_classificacao_no_cenario_3(self):
         entrada = DocumentoEntrada(**self._carregar_cenario("3_auditoria_humana")["requisicao_entrada"])
 

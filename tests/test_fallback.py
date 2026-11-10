@@ -65,6 +65,23 @@ def test_as_27_ufs_sao_reconhecidas(uf):
     assert crm_extraido(receita(f"CRM-{uf} 123456")) == f"123456-{uf}"
 
 
+def test_receita_com_crm_sem_uf_vai_para_a_revisao_humana():
+    # Antes o modo sem IA completava "SP" e a receita seguia para a farmácia como se o CRM fosse válido.
+    resposta = executar_triagem_mediflow(DocumentoEntrada(documento_id="DOC-CRM-SEM-UF", documento_texto=receita("CRM 112233")))
+
+    assert resposta.dados_extraidos.medico_solicitante.crm == "112233"
+    assert resposta.decisao_roteamento.destino_principal == DestinoRoteamento.FILA_REVISAO_HUMANA
+    assert resposta.status == StatusProcessamento.PENDENTE_AUDITORIA
+    assert "CRM do médico ausente ou inválido" in resposta.decisao_roteamento.justificativa_roteamento
+
+
+def test_receita_com_crm_e_uf_vai_para_a_farmacia():
+    resposta = executar_triagem_mediflow(DocumentoEntrada(documento_id="DOC-CRM-COM-UF", documento_texto=receita("CRM-SP 112233")))
+
+    assert resposta.dados_extraidos.medico_solicitante.crm == "112233-SP"
+    assert resposta.decisao_roteamento.destino_principal == DestinoRoteamento.FARMACIA_HOSPITALAR
+
+
 def test_receita_sem_crm_fica_sem_crm():
     assert crm_extraido("RECEITUARIO MEDICO. Paciente: Joana Exemplo, 45 anos. Solicitante: Dra. Clara Ficticia.") is None
 

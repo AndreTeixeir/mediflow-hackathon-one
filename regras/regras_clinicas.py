@@ -50,6 +50,9 @@ NEGADORES = (
 )
 JANELA_DE_NEGACAO_EM_PALAVRAS = 5
 
+# Começo do motivo (justificativa e alerta) quando o CRM do médico falta ou não é válido.
+AVISO_CRM_INVALIDO = "CRM do médico ausente ou inválido"
+
 # "PCR" é ambíguo: parada cardiorrespiratória ou proteína C reativa. Só conta como parada se a
 # MESMA frase tiver uma palavra do primeiro grupo, e nunca conta se tiver uma do segundo.
 CONTEXTO_DE_PARADA_DO_PCR = ("parada", "rcp", "reanimacao", "revertida", "ciclos")
@@ -163,19 +166,29 @@ def _justificativa_prioritaria(termo: str) -> str:
     return f"Termo de prioridade clínica encontrado no documento ('{termo}')."
 
 
+# Os quatro formatos aceitos: 145892-SP, 145892/SP, CRM-SP 145892 e CRM/SP 145892.
+# O número tem de 4 a 6 dígitos e a UF precisa ser uma das 27.
+_FORMATOS_DE_CRM = (
+    re.compile(r"(?P<numero>\d{4,6})[-/](?P<uf>[A-Z]{2})"),
+    re.compile(r"CRM[-/](?P<uf>[A-Z]{2}) (?P<numero>\d{4,6})"),
+)
+
+
 def validar_crm(crm: Optional[str]) -> Tuple[bool, str]:
     """
-    Valida se o CRM possui formato razoável (números + UF, ex: 145892-SP).
+    Valida o CRM: número de 4 a 6 dígitos com UF válida, num dos formatos 145892-SP, 145892/SP,
+    CRM-SP 145892 ou CRM/SP 145892. Um CRM só com o número (sem UF) é inválido.
     """
     if not crm or not crm.strip():
         return False, "CRM não informado ou vazio"
 
-    crm_limpo = crm.strip().upper()
-    padrao = r'(\d{3,8})'
-    if re.search(padrao, crm_limpo):
-        return True, "CRM Válido"
+    crm_limpo = " ".join(crm.strip().upper().split())
+    for formato in _FORMATOS_DE_CRM:
+        encontrado = formato.fullmatch(crm_limpo)
+        if encontrado and encontrado.group("uf") in UFS_VALIDAS:
+            return True, "CRM Válido"
 
-    return False, f"Formato de CRM suspeito ou inválido: '{crm}'"
+    return False, f"Formato de CRM suspeito ou inválido: '{crm[:40]}'"
 
 
 def detectar_urgencia_clinica(texto: str, dados: DadosExtraidos) -> Tuple[bool, str]:
@@ -259,14 +272,14 @@ def destino_por_tipo(tipo_documento: str) -> DestinoRoteamento:
     return DestinoRoteamento.PRONTUARIO_ELETRONICO
 
 
-def gerar_notificacao_urgente(dados: DadosExtraidos, canal_origem: str) -> NotificacaoGerada:
+def gerar_notificacao_urgente(dados: DadosExtraidos, canal_origem: str, aviso: Optional[str] = None) -> NotificacaoGerada:
     """O alerta ao plantão médico de um documento crítico (ou mandado para a urgência por quem revisou)."""
     paciente_nome = dados.paciente.nome if dados.paciente and dados.paciente.nome else "Paciente não identificado"
     diag = dados.diagnostico_principal or "Quadro agudo"
-    return NotificacaoGerada(
-        canal="Alerta_Plantao_Medico",
-        mensagem=f"ALERTA URGENTE: Laudo critico de {diag} para paciente {paciente_nome} no {canal_origem}."
-    )
+    mensagem = f"ALERTA URGENTE: Laudo critico de {diag} para paciente {paciente_nome} no {canal_origem}."
+    if aviso:
+        mensagem += f" Atenção: {aviso}"
+    return NotificacaoGerada(canal="Alerta_Plantao_Medico", mensagem=mensagem)
 
 
 def executar_roteamento_clinico(
@@ -282,25 +295,36 @@ def executar_roteamento_clinico(
     """
     achado = classificar_nivel_urgencia(texto_original, dados)
     score_confianca, pendencias = calcular_score_confianca(classificacao, dados, texto_original)
+    crm_valido, motivo_crm = validar_crm(dados.medico_solicitante.crm if dados.medico_solicitante else None)
 
-    # Regra 1: Caso Urgente Crítico (Prioridade máxima de atendimento)
+    # Regra 1: Caso Urgente Crítico (Prioridade máxima de atendimento). O CRM ausente ou inválido
+    # não atrasa um caso crítico: ele segue para a emergência, com o aviso no alerta e na justificativa.
     if achado.nivel == NivelUrgencia.CRITICO:
+        justificativa = _justificativa_critica(achado.termo)
+        aviso_crm = None
+        if not crm_valido:
+            aviso_crm = f"{AVISO_CRM_INVALIDO} ({motivo_crm})."
+            justificativa += f" Atenção: {aviso_crm}"
         return DecisaoRoteamento(
             destino_principal=DestinoRoteamento.FILA_EMERGENCIA,
             requer_auditoria_humana=False,
-            justificativa_roteamento=_justificativa_critica(achado.termo),
-            notificacao_gerada=gerar_notificacao_urgente(dados, canal_origem)
+            justificativa_roteamento=justificativa,
+            notificacao_gerada=gerar_notificacao_urgente(dados, canal_origem, aviso_crm)
         )
 
-    # Regra 2: Termo prioritário ou baixa confiança -> Human-in-the-Loop (Auditoria).
-    # Quem revisa pode mandar um prioritário para a urgência pela auditoria.
+    # Regra 2: CRM ausente ou inválido, termo prioritário ou baixa confiança -> Human-in-the-Loop
+    # (Auditoria). O CRM manda para a revisão qualquer que seja o score. Quem revisa pode mandar um
+    # prioritário para a urgência pela auditoria.
     motivos = []
+    if not crm_valido:
+        motivos.append(f"{AVISO_CRM_INVALIDO}: {motivo_crm}.")
     if achado.nivel == NivelUrgencia.PRIORITARIO:
         motivos.append(_justificativa_prioritaria(achado.termo))
     if score_confianca < limiar_auditoria_humana or len(pendencias) >= 2:
         motivo_score = f"Score de confiança baixo ({score_confianca:.2f})."
-        if pendencias:
-            motivo_score += f" Inconsistências: {'; '.join(pendencias)}."
+        outras_inconsistencias = [p for p in pendencias if p != motivo_crm]  # o CRM já foi dito acima
+        if outras_inconsistencias:
+            motivo_score += f" Inconsistências: {'; '.join(outras_inconsistencias)}."
         motivos.append(motivo_score)
     if motivos:
         return DecisaoRoteamento(
