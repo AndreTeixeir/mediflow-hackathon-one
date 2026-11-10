@@ -36,7 +36,17 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-MODELO_GEMINI_PADRAO = os.getenv("LLM_MODEL", "gemini-2.5-flash").strip() or "gemini-2.5-flash"
+# O gemini-2.5-flash não está mais disponível para chaves novas (a API responde 404).
+# O gemini-3.5-flash-lite foi testado com texto, PNG e PDF escaneado.
+MODELO_GEMINI_DEFAULT = "gemini-3.5-flash-lite"
+
+
+def resolver_modelo(valor_do_ambiente: Optional[str]) -> str:
+    """O modelo de LLM_MODEL; vazio ou só espaços vale o padrão."""
+    return (valor_do_ambiente or "").strip() or MODELO_GEMINI_DEFAULT
+
+
+MODELO_GEMINI_PADRAO = resolver_modelo(os.getenv("LLM_MODEL"))
 
 
 def obter_chave_llm() -> Optional[str]:

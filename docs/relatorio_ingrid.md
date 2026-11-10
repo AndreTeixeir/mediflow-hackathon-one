@@ -16,7 +16,7 @@ De acordo com a divisão oficial de tarefas da equipe (`divisao_tarefas_mediflow
 ### 1.1. Grafo de Decisão Condicional (`agente/grafo.py` & `agente/__init__.py`)
 Implementação do motor de orquestração autônomo com **LangGraph (`StateGraph`)** utilizando o estado tipado `EstadoAgenteMediFlow` e conectando os contratos Pydantic (`contratos/modelos.py`) às regras clínicas (`regras/regras_clinicas.py`):
 - **`no_ingerir_documento`**: Recebe o `DocumentoEntrada` e aciona o pipeline de leitura e normalização documental (`PDF`, `PNG/JPG`, `Base64`, `TXT/JSON`).
-- **`no_classificar_e_extrair`**: Executa a análise via **Google Gemini (`gemini-2.5-flash`)** com *Structured Outputs* (`ResultadoExtracaoLLM`) ou fallback clínico determinístico, produzindo `ClassificacaoDocumento` e `DadosExtraidos`.
+- **`no_classificar_e_extrair`**: Executa a análise via **Google Gemini (`gemini-3.5-flash-lite`)** com *Structured Outputs* (`ResultadoExtracaoLLM`) ou fallback clínico determinístico, produzindo `ClassificacaoDocumento` e `DadosExtraidos`.
 - **`no_avaliar_consistencia_e_urgencia`**: Calcula o Score de Confiança consolidado (`calcular_score_confianca`), identifica pendências clínicas e detecta quadros críticos de emergência (`detectar_urgencia_clinica`).
 - **Aresta Condicional (`decidir_caminho_triagem`)**:
   - **`no_rotear_emergencia`**: Prioridade máxima para achados críticos (ex.: *TEP Agudo*), gerando alerta imediato no canal `Alerta_Plantao_Medico` e roteando para `Fila_Emergencia_Medica`.
