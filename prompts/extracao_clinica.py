@@ -30,6 +30,24 @@ class ResultadoExtracaoLLM(BaseModel):
         description="Transcrição textual fiel do documento caso a entrada seja imagem ou PDF digitalizado."
     )
 
+    @classmethod
+    def model_json_schema(cls, *args, **kwargs) -> dict:
+        """
+        Gera o JSON Schema compatível com a API Google Gemini (google-genai SDK),
+        removendo recursivamente a chave 'examples' que não é aceita pelo Schema OpenAPI do Gemini.
+        Preserva os exemplos nos contratos Pydantic originais (Lethicia) para Swagger e documentação.
+        """
+        schema = super().model_json_schema(*args, **kwargs)
+
+        def _remover_examples(d):
+            if isinstance(d, dict):
+                return {k: _remover_examples(v) for k, v in d.items() if k != "examples"}
+            elif isinstance(d, list):
+                return [_remover_examples(i) for i in d]
+            return d
+
+        return _remover_examples(schema)
+
 
 SYSTEM_PROMPT_MEDIFLOW = (
     "Você é o agente clínico autônomo MediFlow, especialista em auditoria médica, "
