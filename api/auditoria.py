@@ -22,6 +22,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import ValidationError
 
 from agente.grafo import ORDEM_DE_PRIORIDADE, status_para_destino
+from api.cache_listagens import LISTAGENS
 from api.dependencias import obter_repositorio
 from api.triagem import bucket_do_destino
 from api.validacao import PADRAO_DOCUMENTO_ID
@@ -59,8 +60,9 @@ logger = logging.getLogger("mediflow.api.auditoria")
 
 router = APIRouter()
 
-# A fila e o histórico devolvem no máximo isto. Cada item é uma leitura no armazenamento.
-LIMITE_DE_ITENS = 200
+# A fila e o histórico devolvem no máximo isto. Cada item é uma leitura no armazenamento (na OCI, uma
+# requisição da cota mensal): o limite e o cache de api/cache_listagens.py seguram o custo de cada consulta.
+LIMITE_DE_ITENS = 50
 # Quando a entrada original já não está em `recebidos` (por exemplo, apagada pela regra de ciclo de vida).
 CANAL_NAO_INFORMADO = "canal de origem não informado"
 
@@ -115,9 +117,7 @@ def _ler_triagens(
 # GET /api/v1/auditoria/pendentes e GET /api/v1/documentos
 # ============================================================================
 
-@router.get("/api/v1/auditoria/pendentes", response_model=List[ItemPendenteAuditoria])
-def listar_pendentes(repositorio: RepositorioDocumentos = Depends(obter_repositorio)):
-    """A fila de revisão humana: do documento que espera há mais tempo para o mais novo (até 200)."""
+def _calcular_pendentes(repositorio: RepositorioDocumentos) -> List[ItemPendenteAuditoria]:
     bucket = obter_buckets().auditoria_humana
     with _falha_de_armazenamento_vira_503():
         objetos = repositorio.listar(bucket)[:LIMITE_DE_ITENS]
@@ -135,9 +135,7 @@ def listar_pendentes(repositorio: RepositorioDocumentos = Depends(obter_reposito
         ]
 
 
-@router.get("/api/v1/documentos", response_model=List[ResumoDocumento])
-def listar_documentos(repositorio: RepositorioDocumentos = Depends(obter_repositorio)):
-    """O histórico dos buckets de rotina, urgentes, auditoria humana e rejeitados, do mais novo (até 200)."""
+def _calcular_historico(repositorio: RepositorioDocumentos) -> List[ResumoDocumento]:
     buckets = obter_buckets()
     with _falha_de_armazenamento_vira_503():
         todos = [
@@ -157,6 +155,21 @@ def listar_documentos(repositorio: RepositorioDocumentos = Depends(obter_reposit
             )
             for bucket, info, triagem in _ler_triagens(repositorio, recentes)
         ]
+
+
+# O 503 do armazenamento levanta dentro do cálculo, então nunca entra no cache.
+@router.get("/api/v1/auditoria/pendentes", response_model=List[ItemPendenteAuditoria])
+def listar_pendentes(repositorio: RepositorioDocumentos = Depends(obter_repositorio)):
+    """A fila de revisão humana: do documento que espera há mais tempo para o mais novo (até 50).
+    O resultado vale por um minuto, ou até uma triagem ou decisão registrada."""
+    return LISTAGENS.obter("pendentes", lambda: _calcular_pendentes(repositorio))
+
+
+@router.get("/api/v1/documentos", response_model=List[ResumoDocumento])
+def listar_documentos(repositorio: RepositorioDocumentos = Depends(obter_repositorio)):
+    """O histórico dos buckets de rotina, urgentes, auditoria humana e rejeitados, do mais novo (até 50).
+    O resultado vale por um minuto, ou até uma triagem ou decisão registrada."""
+    return LISTAGENS.obter("documentos", lambda: _calcular_historico(repositorio))
 
 
 # ============================================================================
@@ -286,5 +299,8 @@ def decidir(
             raise HTTPException(status_code=409, detail="Já existe um documento com este ID no destino da decisão.") from None
         except ObjetoNaoEncontrado:
             raise HTTPException(status_code=404, detail="Documento não encontrado entre os pendentes de auditoria.") from None
+
+        # O documento mudou de bucket: a fila e o histórico em cache já não valem.
+        LISTAGENS.limpar()
 
     return decidido

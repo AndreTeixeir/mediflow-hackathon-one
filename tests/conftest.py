@@ -43,6 +43,15 @@ def seguranca_da_api(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def listagens_sem_cache():
+    """O cache das listagens da auditoria é global ao processo: limpa antes de cada teste, para um não ver o
+    resultado que o anterior deixou guardado (e para um teste com relógio injetado começar do zero)."""
+    from api.cache_listagens import LISTAGENS
+
+    LISTAGENS.limpar()
+
+
+@pytest.fixture(autouse=True)
 def buckets_com_o_prefixo_padrao(monkeypatch):
     """Os testes esperam os buckets mediflow-*: o OCI_BUCKET_PREFIXO do .env de quem roda (a equipe pode usar
     outro) não pode mudar os nomes. Vazio vale o padrão e, vazio, o load_dotenv() não o preenche de volta."""

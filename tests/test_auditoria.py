@@ -145,9 +145,9 @@ def test_fila_vem_do_documento_que_espera_ha_mais_tempo_para_o_mais_novo(cliente
     assert ids_da_fila(cliente) == ["DOC-A", "DOC-C", "DOC-B"]
 
 
-def test_fila_devolve_no_maximo_200_itens_os_mais_antigos(cliente, repositorio, tmp_path):
+def test_fila_devolve_no_maximo_50_itens_os_mais_antigos(cliente, repositorio, tmp_path):
     modelo = enviar_pendente(cliente, "DOC-MODELO")
-    for numero in range(204):
+    for numero in range(54):
         documento_id = f"DOC-LOTE-{numero:03d}"
         repositorio.salvar_json(AUDITORIA, f"{documento_id}.json", dict(modelo, documento_id=documento_id))
         os.utime(tmp_path / AUDITORIA / f"{documento_id}.json", (10_000 + numero, 10_000 + numero))
@@ -155,8 +155,8 @@ def test_fila_devolve_no_maximo_200_itens_os_mais_antigos(cliente, repositorio, 
 
     ids = ids_da_fila(cliente)
 
-    assert len(ids) == 200
-    assert ids[0] == "DOC-LOTE-000" and ids[-1] == "DOC-LOTE-199"
+    assert len(ids) == 50
+    assert ids[0] == "DOC-LOTE-000" and ids[-1] == "DOC-LOTE-049"
 
 
 @pytest.mark.parametrize("conteudo", ['{"nao": "e uma triagem"}', "nao e json", "[1, 2, 3]", "\ufffd\ufffd"])
@@ -560,9 +560,9 @@ def test_historico_mostra_o_documento_no_bucket_novo_depois_da_decisao(cliente):
     assert [(h["documento_id"], h["bucket"], h["status"]) for h in historico] == [("DOC-H-MUDA", URGENTES, "processado")]
 
 
-def test_historico_devolve_no_maximo_200_os_mais_recentes(cliente, repositorio, tmp_path):
+def test_historico_devolve_no_maximo_50_os_mais_recentes(cliente, repositorio, tmp_path):
     modelo = enviar(cliente, cenario("1_rotina"), "DOC-MODELO")
-    for numero in range(204):
+    for numero in range(54):
         documento_id = f"DOC-LOTE-{numero:03d}"
         repositorio.salvar_json(ROTINA, f"{documento_id}.json", dict(modelo, documento_id=documento_id))
         os.utime(tmp_path / ROTINA / f"{documento_id}.json", (10_000 + numero, 10_000 + numero))
@@ -570,6 +570,6 @@ def test_historico_devolve_no_maximo_200_os_mais_recentes(cliente, repositorio, 
 
     historico = cliente.get("/api/v1/documentos").json()
 
-    assert len(historico) == 200
-    assert historico[0]["documento_id"] == "DOC-LOTE-203"
+    assert len(historico) == 50
+    assert historico[0]["documento_id"] == "DOC-LOTE-053"
     assert "DOC-MODELO" not in [h["documento_id"] for h in historico]

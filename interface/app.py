@@ -30,14 +30,17 @@ MODO_ARQUIVO = "Enviar arquivo PDF ou imagem"
 CANAIS_ORIGEM = [canal.value for canal in CanalOrigem]
 # A fila e o histórico mudam por fora (outra pessoa decide, a API recebe um documento): o painel os
 # relê a cada 30 s, e na hora quando esta sessão envia ou decide. No modo OCI, cada leitura de uma lista
-# são até 200 consultas ao armazenamento: o cache poupa a cota do Always Free.
+# são até 50 consultas ao armazenamento: o cache poupa a cota do Always Free. A API tem o seu próprio cache
+# (60 s), que protege a cota de todas as sessões juntas: uma mudança feita por outra pessoa pode levar até
+# a soma dos dois para aparecer, e as gravações desta sessão aparecem na hora.
 TTL_DO_CACHE_SEGUNDOS = 30
 # Os destinos de um documento aprovado (o bucket de rotina), para o contador: o nome do bucket depende do
 # prefixo configurado no servidor, o destino é do contrato.
 DESTINOS_DE_ROTINA = {"Farmacia_Hospitalar", "Auditoria_Autorizacoes", "Prontuario_Eletronico_do_Paciente"}
 # O rótulo na tela e o valor que a API espera.
 DESTINOS_DA_DECISAO = {"Rotina": "rotina", "Urgente": "urgente", "Rejeitar": "rejeitado"}
-LIMITE_DA_API = 200
+# O mesmo teto das listagens da API (api/auditoria.py).
+LIMITE_DA_API = 50
 REVISOR_MAXIMO = 80
 JUSTIFICATIVA_MINIMA = 5
 JUSTIFICATIVA_MAXIMA = 500

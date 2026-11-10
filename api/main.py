@@ -15,6 +15,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from api.auditoria import router as roteador_da_auditoria
+from api.cache_listagens import LISTAGENS
 from api.dependencias import obter_repositorio
 from api.seguranca import SegurancaMiddleware, ler_configuracao
 from api.triagem import processar_triagem
@@ -88,4 +89,8 @@ def triagem(
     # Roda antes de qualquer gravação: entrada inválida vira 422 e nada é gravado.
     validar_entrada(entrada)
 
-    return processar_triagem(entrada, repositorio)
+    resposta = processar_triagem(entrada, repositorio)
+    # Só uma triagem que deu certo (200) mudou o armazenamento: a fila e o histórico em cache já não valem.
+    # 409, 422 e 503 levantam antes daqui, e o 429 nem chega à rota.
+    LISTAGENS.limpar()
+    return resposta

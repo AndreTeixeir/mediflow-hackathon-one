@@ -156,13 +156,15 @@ Todas as variáveis estão comentadas no `.env.example`.
 |--------|------|-----------|
 | `GET` | `/api/v1/saude` | Responde `{"status": "ok", "armazenamento": "local"}` (ou `"oci"`) |
 | `POST` | `/api/v1/triagem` | Recebe um `DocumentoEntrada` e devolve a `TriagemResposta` |
-| `GET` | `/api/v1/auditoria/pendentes` | A fila de revisão humana (bucket `mediflow-auditoria-humana`): `documento_id`, tipo, prioridade, score, justificativa, dados extraídos e data. Do que espera há mais tempo para o mais novo, até 200 |
+| `GET` | `/api/v1/auditoria/pendentes` | A fila de revisão humana (bucket `mediflow-auditoria-humana`): `documento_id`, tipo, prioridade, score, justificativa, dados extraídos e data. Do que espera há mais tempo para o mais novo, até 50 |
 | `POST` | `/api/v1/auditoria/{documento_id}/decisao` | A decisão de quem revisa: `{"destino": "rotina" \| "urgente" \| "rejeitado", "revisor": "...", "justificativa": "..."}` |
-| `GET` | `/api/v1/documentos` | O histórico dos buckets de rotina, urgentes, auditoria humana e rejeitados, do mais novo, até 200 |
+| `GET` | `/api/v1/documentos` | O histórico dos buckets de rotina, urgentes, auditoria humana e rejeitados, do mais novo, até 50 |
 
 Respostas de erro da triagem: `422` (`documento_id` fora do padrão `[A-Za-z0-9-]{1,64}`, sem `documento_texto` e sem `documento_base64`, `tipo_arquivo` fora de PDF/PNG/JPG/JPEG/WEBP/TXT, Base64 inválido, ou PDF/imagem que não abre; um corpo que não é JSON também dá `422`, sem repetir o que foi enviado), `409` (`documento_id` já recebido) e `503` (falha ao gravar no armazenamento).
 
 #### Auditoria humana
+
+A fila e o histórico devolvem no máximo 50 itens e ficam em cache por 60 segundos (cada item é uma leitura no armazenamento, e na OCI o Always Free tem 50 mil requisições por mês). Uma triagem ou uma decisão registrada limpa o cache, então o que você acabou de fazer aparece na hora; a mudança feita por outra pessoa pode levar até 60 s. O cache é em memória e vale para a API com um worker, como roda no deploy.
 
 A decisão move o documento de `mediflow-auditoria-humana` para `mediflow-rotina` (o destino segue o tipo do documento: farmácia, auditoria de autorizações ou prontuário), `mediflow-urgentes` (`Fila_Emergencia_Medica`, com o alerta ao plantão) ou `mediflow-rejeitados` (`Documento_Rejeitado`, status `rejeitado`). O JSON ganha o campo `auditoria_humana`, com quem decidiu, quando (UTC), o quê e por quê, **e também o destino e a justificativa que o grafo tinha decidido**, para a trilha mostrar o que a IA decidiu e o que a pessoa mudou.
 
