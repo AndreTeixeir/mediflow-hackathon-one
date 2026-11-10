@@ -15,7 +15,6 @@ import logging
 from pathlib import Path
 
 import pytest
-from fastapi.testclient import TestClient
 from PIL import Image
 from pypdf import PdfWriter
 
@@ -63,9 +62,9 @@ def repositorio(tmp_path):
 
 
 @pytest.fixture
-def cliente(repositorio):
+def cliente(repositorio, novo_cliente):
     app.dependency_overrides[obter_repositorio] = lambda: repositorio
-    yield TestClient(app)
+    yield novo_cliente()
     app.dependency_overrides.clear()
 
 
@@ -525,10 +524,10 @@ class RepositorioFalho:
 
 
 @pytest.mark.parametrize("falha_na_gravacao", [1, 2])
-def test_falha_do_repositorio_da_503_e_nunca_afirma_sucesso(falha_na_gravacao):
+def test_falha_do_repositorio_da_503_e_nunca_afirma_sucesso(falha_na_gravacao, novo_cliente):
     app.dependency_overrides[obter_repositorio] = lambda: RepositorioFalho(falha_na_gravacao)
     try:
-        resposta = TestClient(app).post(
+        resposta = novo_cliente().post(
             "/api/v1/triagem", json=carregar_cenario("1_rotina")["requisicao_entrada"]
         )
     finally:
@@ -571,11 +570,11 @@ def repo_instrumentado(tmp_path):
 
 
 @pytest.fixture
-def cliente_instrumentado(repo_instrumentado):
+def cliente_instrumentado(repo_instrumentado, novo_cliente):
     app.dependency_overrides[obter_repositorio] = lambda: repo_instrumentado
     # raise_server_exceptions=False: devolve o 500 que um cliente real veria,
     # em vez de relançar a exceção dentro do teste.
-    yield TestClient(app, raise_server_exceptions=False)
+    yield novo_cliente(raise_server_exceptions=False)
     app.dependency_overrides.clear()
 
 

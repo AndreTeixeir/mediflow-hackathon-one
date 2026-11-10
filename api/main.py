@@ -7,6 +7,7 @@ Execução (a partir da raiz): python -m uvicorn api.main:app --reload
 """
 
 import logging
+from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI
@@ -15,6 +16,7 @@ from fastapi.responses import JSONResponse
 
 from api.auditoria import router as roteador_da_auditoria
 from api.dependencias import obter_repositorio
+from api.seguranca import SegurancaMiddleware, ler_configuracao
 from api.triagem import processar_triagem
 from api.validacao import validar_entrada
 from armazenamento.repositorio import FalhaArmazenamento, ObjetoJaExiste, RepositorioDocumentos
@@ -24,7 +26,22 @@ load_dotenv()
 
 logger = logging.getLogger("mediflow.api")
 
-app = FastAPI(title="MediFlow API", version="0.1.0")
+
+@asynccontextmanager
+async def ciclo_de_vida(_aplicacao: FastAPI):
+    # A API não sobe sem uma chave de acesso válida: ConfiguracaoInvalida interrompe a subida, e a
+    # mensagem explica como gerar a chave. Só MEDIFLOW_API_AUTH=desligada a sobe sem chave.
+    configuracao = ler_configuracao()
+    if configuracao.autenticacao_desligada:
+        logger.warning(
+            "MEDIFLOW_API_AUTH=desligada: a API está aceitando requisições SEM chave de acesso. "
+            "Use só em desenvolvimento."
+        )
+    yield
+
+
+app = FastAPI(title="MediFlow API", version="0.1.0", lifespan=ciclo_de_vida)
+app.add_middleware(SegurancaMiddleware)
 app.include_router(roteador_da_auditoria)
 
 

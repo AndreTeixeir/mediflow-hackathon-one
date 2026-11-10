@@ -20,7 +20,6 @@ from pathlib import Path
 import pytest
 import requests
 import streamlit as st
-from fastapi.testclient import TestClient
 from streamlit.testing.v1 import AppTest
 
 from api.main import app, obter_repositorio
@@ -106,9 +105,9 @@ class ApiFalsa:
 class ApiReal:
     """A aplicação FastAPI de verdade, em processo, com uma pasta temporária como armazenamento."""
 
-    def __init__(self, repositorio):
+    def __init__(self, repositorio, cliente):
         app.dependency_overrides[obter_repositorio] = lambda: repositorio
-        self.cliente = TestClient(app)
+        self.cliente = cliente
         self.chamadas = []
 
     def __call__(self, metodo, url, **kwargs):
@@ -139,8 +138,8 @@ def api(monkeypatch):
 
 
 @pytest.fixture
-def api_real(monkeypatch, tmp_path):
-    real = ApiReal(RepositorioLocal(tmp_path))
+def api_real(monkeypatch, tmp_path, novo_cliente):
+    real = ApiReal(RepositorioLocal(tmp_path), novo_cliente())
     monkeypatch.setattr(requests, "request", real)
     return real
 

@@ -16,7 +16,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
-from fastapi.testclient import TestClient
 
 from api.main import app, obter_repositorio
 from armazenamento.repositorio import FalhaArmazenamento, RepositorioLocal
@@ -45,9 +44,9 @@ def repositorio(tmp_path):
 
 
 @pytest.fixture
-def cliente(repositorio):
+def cliente(repositorio, novo_cliente):
     app.dependency_overrides[obter_repositorio] = lambda: repositorio
-    yield TestClient(app)
+    yield novo_cliente()
     app.dependency_overrides.clear()
 
 
@@ -422,11 +421,11 @@ class RepositorioQueFalha(RepositorioLocal):
 
 
 @pytest.fixture
-def cliente_com_falha(tmp_path):
+def cliente_com_falha(tmp_path, novo_cliente):
     def criar(**falhas):
         repo = RepositorioQueFalha(tmp_path, **falhas)
         app.dependency_overrides[obter_repositorio] = lambda: repo
-        return TestClient(app)
+        return novo_cliente()
 
     yield criar
     app.dependency_overrides.clear()
@@ -485,12 +484,12 @@ def test_entrada_original_ilegivel_nao_impede_a_decisao_urgente(cliente, tmp_pat
     assert "canal de origem não informado" in resposta.json()["decisao_roteamento"]["notificacao_gerada"]["mensagem"]
 
 
-def test_duas_decisoes_ao_mesmo_tempo_para_destinos_diferentes_resultam_em_uma_so(cliente, repositorio, tmp_path):
+def test_duas_decisoes_ao_mesmo_tempo_para_destinos_diferentes_resultam_em_uma_so(cliente, repositorio, tmp_path, novo_cliente):
     enviar_pendente(cliente, "DOC-CORRIDA")
     largada = threading.Barrier(2)
 
     def decidir_em_thread(destino):
-        thread_cliente = TestClient(app)
+        thread_cliente = novo_cliente()
         largada.wait()
         return thread_cliente.post("/api/v1/auditoria/DOC-CORRIDA/decisao", json=decisao(destino=destino)).status_code
 
