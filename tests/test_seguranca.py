@@ -333,3 +333,163 @@ def test_conexao_websocket_e_recusada(sem_chave, chave_de_teste):
             with sem_chave.websocket_connect("/ws", headers=cabecalhos):
                 pass
         assert capturada.value.code == 1008
+
+
+# ============================================================================
+# Limite de 15 MB (o mesmo client_max_body_size 15M do nginx)
+# ============================================================================
+
+UM_MIB = 1024 * 1024
+LIMITE = 15 * UM_MIB
+
+
+class ResultadoDaChamada:
+    def __init__(self):
+        self.status = None  # o status que o middleware respondeu (None se não respondeu)
+        self.corpo_da_resposta = None
+        self.leituras = 0  # quantas vezes o middleware leu o corpo do cliente
+        self.app_chamada = False
+        self.mensagens_da_app = []  # o que a rota recebeu ao ler o corpo
+
+
+def chamar_middleware(chave, pedacos, content_length=None, com_chave=True, desconecta_no_fim=False):
+    """Chama o middleware direto, com o corpo em pedaços, como um servidor ASGI faria."""
+    resultado = ResultadoDaChamada()
+    fila = [{"type": "http.request", "body": p, "more_body": i < len(pedacos) - 1} for i, p in enumerate(pedacos)]
+    if desconecta_no_fim:
+        fila = fila[:-1] + [{"type": "http.disconnect"}]
+
+    async def receive():
+        resultado.leituras += 1
+        return fila.pop(0) if fila else {"type": "http.disconnect"}
+
+    async def send(mensagem):
+        if mensagem["type"] == "http.response.start":
+            resultado.status = mensagem["status"]
+        elif mensagem["type"] == "http.response.body":
+            resultado.corpo_da_resposta = (resultado.corpo_da_resposta or b"") + mensagem.get("body", b"")
+
+    async def aplicacao_de_destino(scope, receive_da_rota, send_da_rota):
+        resultado.app_chamada = True
+        resultado.mensagens_da_app.append(await receive_da_rota())
+        resultado.mensagens_da_app.append(await receive_da_rota())
+        await send_da_rota({"type": "http.response.start", "status": 200, "headers": []})
+        await send_da_rota({"type": "http.response.body", "body": b""})
+
+    cabecalhos = [(b"x-api-key", chave.encode())] if com_chave else []
+    if content_length is not None:
+        cabecalhos.append((b"content-length", str(content_length).encode()))
+    escopo = {"type": "http", "method": "POST", "path": "/api/v1/triagem", "headers": cabecalhos}
+
+    asyncio.run(SegurancaMiddleware(aplicacao_de_destino)(escopo, receive, send))
+    return resultado
+
+
+def test_content_length_acima_do_limite_da_413_antes_de_ler_o_corpo(chave_de_teste):
+    resultado = chamar_middleware(chave_de_teste, [b"x"], content_length=LIMITE + 1)
+
+    assert resultado.status == 413
+    assert resultado.leituras == 0  # nem uma leitura do corpo
+    assert not resultado.app_chamada
+    assert json.loads(resultado.corpo_da_resposta) == {"detail": "Corpo da requisição acima do limite de 15 MB."}
+
+
+def test_sem_content_length_o_corpo_e_lido_com_teto_e_cortado_em_413(chave_de_teste):
+    pedacos = [b"x" * UM_MIB] * 20  # 20 MiB, sem declarar o tamanho
+
+    resultado = chamar_middleware(chave_de_teste, pedacos)
+
+    assert resultado.status == 413
+    assert not resultado.app_chamada
+    assert resultado.leituras == 16  # parou ao passar de 15 MiB, sem ler os outros 4 pedaços
+
+
+def test_content_length_que_mente_tambem_e_cortado_durante_a_leitura(chave_de_teste):
+    resultado = chamar_middleware(chave_de_teste, [b"x" * UM_MIB] * 20, content_length=10)
+
+    assert resultado.status == 413
+    assert not resultado.app_chamada
+
+
+def test_exatamente_15_mib_passa_para_a_rota(chave_de_teste):
+    resultado = chamar_middleware(chave_de_teste, [b"x" * UM_MIB] * 15, content_length=LIMITE)
+
+    assert resultado.status == 200
+    assert resultado.app_chamada
+    assert len(resultado.mensagens_da_app[0]["body"]) == LIMITE
+
+
+def test_um_byte_acima_de_15_mib_da_413(chave_de_teste):
+    resultado = chamar_middleware(chave_de_teste, [b"x" * LIMITE, b"y"])
+
+    assert resultado.status == 413
+
+
+def test_content_length_invalido_vale_como_ausente_e_o_corpo_e_lido_com_teto(chave_de_teste):
+    resultado = chamar_middleware(chave_de_teste, [b"abc"], content_length="isso-nao-e-um-numero")
+
+    assert resultado.status == 200
+    assert resultado.mensagens_da_app[0]["body"] == b"abc"
+
+
+def test_o_corpo_lido_em_pedacos_e_repassado_a_rota_inteiro_e_em_memoria(chave_de_teste):
+    resultado = chamar_middleware(chave_de_teste, [b"ab", b"cd", b"ef"])
+
+    primeira, segunda = resultado.mensagens_da_app
+    assert primeira == {"type": "http.request", "body": b"abcdef", "more_body": False}
+    # Depois do corpo, a rota volta ao canal original, que só traz o aviso de desconexão.
+    assert segunda == {"type": "http.disconnect"}
+
+
+def test_corpo_vazio_chega_vazio_a_rota(chave_de_teste):
+    resultado = chamar_middleware(chave_de_teste, [b""])
+
+    assert resultado.mensagens_da_app[0] == {"type": "http.request", "body": b"", "more_body": False}
+
+
+def test_cliente_que_desconecta_no_meio_nao_chama_a_rota_nem_responde(chave_de_teste):
+    resultado = chamar_middleware(chave_de_teste, [b"abc", b"def"], desconecta_no_fim=True)
+
+    assert not resultado.app_chamada
+    assert resultado.status is None
+
+
+def test_sem_a_chave_o_401_vem_antes_do_413_e_o_corpo_nao_e_lido(chave_de_teste):
+    resultado = chamar_middleware(chave_de_teste, [b"x"], content_length=LIMITE * 2, com_chave=False)
+
+    assert resultado.status == 401
+    assert resultado.leituras == 0
+
+
+def test_corpo_de_16_mb_na_api_de_verdade_da_413_e_nada_e_gravado(novo_cliente, tmp_path):
+    resposta = novo_cliente().post(
+        "/api/v1/triagem", content=b"x" * (16 * UM_MIB), headers={"content-type": "application/json"}
+    )
+
+    assert resposta.status_code == 413
+    assert resposta.json() == {"detail": "Corpo da requisição acima do limite de 15 MB."}
+    assert nada_gravado(tmp_path)
+
+
+def test_corpo_de_exatamente_15_mib_chega_a_rota_que_o_recusa_por_ser_invalido(novo_cliente, tmp_path):
+    resposta = novo_cliente().post("/api/v1/triagem", content=b"x" * LIMITE, headers={"content-type": "application/json"})
+
+    assert resposta.status_code == 422  # passou pelo middleware; quem recusou foi a validação da rota
+    assert nada_gravado(tmp_path)
+
+
+def test_corpo_grande_e_valido_chega_inteiro_a_rota(novo_cliente, tmp_path):
+    import base64
+
+    texto = ("LAUDO DE EXAME LABORATORIAL. Paciente: Maria Exemplo, 40 anos. Hemograma normal. " * 40_000).encode()
+    base64_do_arquivo = base64.b64encode(texto).decode("ascii")
+    assert 2 * UM_MIB < len(base64_do_arquivo) < LIMITE  # grande, e ainda dentro do limite
+
+    resposta = novo_cliente().post(
+        "/api/v1/triagem",
+        json={"documento_id": "DOC-GRANDE", "tipo_arquivo": "TXT", "documento_base64": base64_do_arquivo, "canal_origem": "Ambulatorio"},
+    )
+
+    assert resposta.status_code == 200, resposta.text
+    gravado = json.loads((tmp_path / "mediflow-recebidos" / "DOC-GRANDE.json").read_text(encoding="utf-8"))
+    assert gravado["documento_base64"] == base64_do_arquivo  # o corpo inteiro chegou à rota
