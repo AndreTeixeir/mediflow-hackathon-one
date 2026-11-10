@@ -11,6 +11,7 @@ from functools import lru_cache
 
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from api.triagem import processar_triagem
@@ -34,6 +35,18 @@ app = FastAPI(title="MediFlow API", version="0.1.0")
 def obter_repositorio() -> RepositorioDocumentos:
     """Criado uma vez, no primeiro uso. Os testes o substituem com app.dependency_overrides."""
     return criar_repositorio()
+
+
+@app.exception_handler(RequestValidationError)
+async def tratar_corpo_invalido(request, exc):
+    # O handler padrão do FastAPI devolve também o campo "input" (o valor recusado): com um corpo
+    # binário (multipart, por exemplo) ele quebra com UnicodeDecodeError e a resposta vira 500, e
+    # com um corpo de texto ele repetiria o documento clínico enviado. Aqui só saem loc, msg e type.
+    erros = [
+        {"loc": list(erro.get("loc", ())), "msg": erro.get("msg", ""), "type": erro.get("type", "")}
+        for erro in exc.errors()
+    ]
+    return JSONResponse(status_code=422, content={"detail": erros})
 
 
 @app.exception_handler(ObjetoJaExiste)

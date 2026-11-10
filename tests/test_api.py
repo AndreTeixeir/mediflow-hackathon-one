@@ -272,6 +272,61 @@ def test_corpo_sem_documento_id_da_422(cliente):
 
 
 # ============================================================================
+# Corpo que não é um JSON válido: 422 com loc, msg e type, nunca 500 nem o campo input
+# ============================================================================
+
+def corpo_multipart(binario: bytes, fronteira="XXFRONTEIRAXX") -> tuple[bytes, dict]:
+    corpo = (
+        f'--{fronteira}\r\nContent-Disposition: form-data; name="arquivo"; filename="a.png"\r\n'
+        "Content-Type: image/png\r\n\r\n"
+    ).encode() + binario + f"\r\n--{fronteira}--\r\n".encode()
+    return corpo, {"content-type": f"multipart/form-data; boundary={fronteira}"}
+
+
+def assert_422_sem_input(resposta):
+    assert resposta.status_code == 422
+    erros = resposta.json()["detail"]
+    assert erros, "esperava ao menos um erro"
+    for erro in erros:
+        assert sorted(erro) == ["loc", "msg", "type"]
+        assert isinstance(erro["loc"], list)
+
+
+def test_multipart_com_bytes_binarios_da_422_e_nao_500(cliente, tmp_path):
+    corpo, cabecalhos = corpo_multipart(b"\x89PNG\r\n\x1a\n\xff\xfe\x00\x80\x81bytes-binarios")
+
+    resposta = cliente.post("/api/v1/triagem", content=corpo, headers=cabecalhos)
+
+    assert_422_sem_input(resposta)
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_json_invalido_da_422_sem_input_nem_ctx(cliente, tmp_path):
+    resposta = cliente.post("/api/v1/triagem", content=b"{nao e json", headers={"content-type": "application/json"})
+
+    assert_422_sem_input(resposta)
+    assert resposta.json()["detail"][0]["type"] == "json_invalid"
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_campo_com_tipo_errado_da_422_sem_repetir_o_valor_enviado(cliente, tmp_path):
+    resposta = cliente.post(
+        "/api/v1/triagem", json={"documento_id": "DOC-TIPO", "documento_texto": ["SEGREDO-DO-PACIENTE"]}
+    )
+
+    assert_422_sem_input(resposta)
+    assert "SEGREDO-DO-PACIENTE" not in resposta.text
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_campo_obrigatorio_ausente_informa_o_nome_do_campo(cliente):
+    resposta = cliente.post("/api/v1/triagem", json={"documento_texto": "texto"})
+
+    assert_422_sem_input(resposta)
+    assert resposta.json()["detail"] == [{"loc": ["body", "documento_id"], "msg": "Field required", "type": "missing"}]
+
+
+# ============================================================================
 # Validação do arquivo em Base64: entrada inválida é 422 e nada é gravado
 # ============================================================================
 
