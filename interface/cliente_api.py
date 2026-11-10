@@ -3,9 +3,9 @@ MediFlow - Cliente HTTP da API para o painel Streamlit
 Hackathon ONE G10 - Grupo 10: MediFlow
 
 Mapeamento: interface/cliente_api.py
-Uma função só faz todas as chamadas do painel à API e traduz cada falha numa mensagem para quem usa a
-tela. Não importa o Streamlit: dá para testar sozinho. Nada é simulado: se a API não responder 200,
-levanta ErroDaApi e quem chamou mostra a mensagem.
+Uma função só faz todas as chamadas do painel à API (com a chave de acesso) e traduz cada falha numa
+mensagem para quem usa a tela. Não importa o Streamlit: dá para testar sozinho. Nada é simulado: se a
+API não responder 200, levanta ErroDaApi e quem chamou mostra a mensagem.
 """
 
 import os
@@ -47,6 +47,13 @@ class ErroDaApi(Exception):
         self.endereco = endereco  # o endereço tentado, quando não foi possível conectar
 
 
+def cabecalhos_da_api() -> Dict[str, str]:
+    """O X-API-Key com MEDIFLOW_API_KEY do ambiente, em toda chamada. Sem a variável, nenhum cabeçalho: a API
+    responde 401 e a tela diz que a chave está ausente. A chave nunca vai para uma mensagem."""
+    chave = (os.getenv("MEDIFLOW_API_KEY") or "").strip()
+    return {"X-API-Key": chave} if chave else {}
+
+
 def url_da_api() -> str:
     """MEDIFLOW_API_URL, lida a cada chamada. Vazia, vale o endereço local."""
     return os.getenv("MEDIFLOW_API_URL", URL_PADRAO_DA_API).strip().rstrip("/") or URL_PADRAO_DA_API
@@ -63,7 +70,7 @@ def chamar_api(
     """Chama a API e devolve o JSON da resposta 200. `mensagens` troca o texto de um código específico."""
     endereco = f"{url_da_api()}{caminho}"
     try:
-        resposta = requests.request(metodo, endereco, json=json, timeout=timeout)
+        resposta = requests.request(metodo, endereco, json=json, timeout=timeout, headers=cabecalhos_da_api())
     except requests.exceptions.ConnectionError:
         raise ErroDaApi("Não foi possível conectar à API.", endereco=endereco) from None
     except requests.exceptions.Timeout:

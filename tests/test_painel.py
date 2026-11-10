@@ -20,8 +20,10 @@ from pathlib import Path
 import pytest
 import requests
 import streamlit as st
+from fastapi.testclient import TestClient
 from streamlit.testing.v1 import AppTest
 
+import interface.cliente_api as cliente_api
 from api.main import app, obter_repositorio
 from armazenamento.repositorio import RepositorioLocal
 
@@ -105,15 +107,16 @@ class ApiFalsa:
 class ApiReal:
     """A aplicação FastAPI de verdade, em processo, com uma pasta temporária como armazenamento."""
 
-    def __init__(self, repositorio, cliente):
+    def __init__(self, repositorio, cliente_com_chave, cliente_sem_chave):
         app.dependency_overrides[obter_repositorio] = lambda: repositorio
-        self.cliente = cliente
+        self.cliente = cliente_com_chave  # para o teste mexer na API por fora do painel
+        self._transporte = cliente_sem_chave  # o painel só entra se mandar a chave sozinho
         self.chamadas = []
 
     def __call__(self, metodo, url, **kwargs):
         caminho = url.removeprefix(URL_DA_API)
         self.chamadas.append((metodo, caminho, kwargs))
-        return self.cliente.request(metodo, caminho, json=kwargs.get("json"))
+        return self._transporte.request(metodo, caminho, json=kwargs.get("json"), headers=kwargs.get("headers"))
 
     def chamadas_de(self, metodo, caminho):
         return [kwargs for m, c, kwargs in self.chamadas if (m, c) == (metodo, caminho)]
@@ -139,7 +142,7 @@ def api(monkeypatch):
 
 @pytest.fixture
 def api_real(monkeypatch, tmp_path, novo_cliente):
-    real = ApiReal(RepositorioLocal(tmp_path), novo_cliente())
+    real = ApiReal(RepositorioLocal(tmp_path), novo_cliente(), TestClient(app))
     monkeypatch.setattr(requests, "request", real)
     return real
 
@@ -721,3 +724,85 @@ def test_timeout_na_abertura_mostra_a_mensagem(api):
 
     assert any("demorou demais" in m for m in mensagens(painel.error))
     assert painel.metric == []
+
+
+# ============================================================================
+# Chave de acesso, limite de 15 MB e tetos diários (Bloco 7)
+# ============================================================================
+
+def test_o_painel_manda_a_chave_de_acesso_em_todas_as_chamadas(api_real, chave_de_teste):
+    enviar_pela_api(api_real, "DOC-CHAVE")
+    painel = abrir_painel()
+    decidir_no_painel(painel, "DOC-CHAVE")
+    enviar_texto(painel)
+
+    assert len(api_real.chamadas) >= 5  # as duas leituras, a decisão e o envio, pelo menos
+    assert {m for m, _, _ in api_real.chamadas} == {"GET", "POST"}
+    for _, caminho, kwargs in api_real.chamadas:
+        assert kwargs["headers"] == {"X-API-Key": chave_de_teste}, caminho
+
+
+def test_sem_a_variavel_no_ambiente_do_painel_nenhum_cabecalho_e_enviado(api, monkeypatch):
+    monkeypatch.setenv("MEDIFLOW_API_KEY", "")
+
+    abrir_painel()
+
+    assert api.chamadas and all(kwargs["headers"] == {} for _, _, kwargs in api.chamadas)
+
+
+def test_chave_errada_no_painel_da_401_com_a_mensagem_clara_e_nada_e_simulado(api_real, monkeypatch):
+    enviar_pela_api(api_real, "DOC-RETIDO-SEM-ACESSO")
+    monkeypatch.setattr(cliente_api, "cabecalhos_da_api", lambda: {"X-API-Key": "chave-errada-" + "z" * 30})
+
+    painel = abrir_painel()
+
+    erros = mensagens(painel.error)
+    assert any("HTTP 401" in m and "MEDIFLOW_API_KEY" in m for m in erros)
+    assert painel.metric == []
+    assert painel.dataframe == []
+    assert "chave-errada" not in " ".join(erros)  # a chave nunca vai para a tela
+    assert not any("DOC-RETIDO-SEM-ACESSO" in m for m in mensagens(painel.markdown))
+
+
+def test_a_chave_do_painel_nunca_aparece_na_tela(api_real, chave_de_teste):
+    painel = abrir_painel()
+    enviar_texto(painel)
+
+    tudo = " ".join(
+        mensagens(painel.markdown) + mensagens(painel.error) + mensagens(painel.warning) + mensagens(painel.success)
+        + mensagens(painel.info) + mensagens(painel.caption) + [j.value for j in painel.json]
+    )
+    assert chave_de_teste not in tudo
+
+
+def test_corpo_acima_de_15_mb_mostra_a_mensagem_de_413_da_api_de_verdade(api_real):
+    painel = abrir_painel()
+
+    enviar_texto(painel, "A" * (16 * UM_MEGABYTE))  # o texto cabe no campo, mas o envio passa dos 15 MB da API
+
+    erros = mensagens(painel.error)
+    assert any("HTTP 413" in m and "15 MB" in m for m in erros)
+    assert not any("Triagem processada" in m for m in mensagens(painel.success))
+    assert metricas(painel)["📄 Total de Documentos"] == "0"
+
+
+def test_teto_diario_mostra_a_mensagem_de_429_da_api_de_verdade(api_real, monkeypatch):
+    monkeypatch.setenv("MEDIFLOW_TETO_DIARIO_DOCUMENTOS", "1")
+    painel = abrir_painel()
+
+    enviar_texto(painel, LAUDO_SEM_CRM)
+    assert any("Triagem processada" in m for m in mensagens(painel.success))
+    painel.button(key="btn_novo_id").click().run()
+    enviar_texto(painel, LAUDO_SEM_CRM)
+
+    erros = mensagens(painel.error)
+    assert any("HTTP 429" in m and "Limite diário de documentos atingido" in m and "amanhã" in m for m in erros)
+    assert metricas(painel)["📄 Total de Documentos"] == "1"  # o segundo não foi recebido
+
+
+def test_chave_do_painel_com_espacos_em_volta_e_aparada(api, monkeypatch):
+    monkeypatch.setenv("MEDIFLOW_API_KEY", "   chave-com-espacos   ")
+
+    abrir_painel()
+
+    assert all(kwargs["headers"] == {"X-API-Key": "chave-com-espacos"} for _, _, kwargs in api.chamadas)
