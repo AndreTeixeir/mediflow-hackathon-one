@@ -101,6 +101,12 @@ Copie o `.env.example` para `.env` e preencha os valores somente na sua máquina
 cp .env.example .env
 ```
 
+A API **não sobe sem a chave de acesso** (`MEDIFLOW_API_KEY`). Gere uma e coloque no `.env` (a seção 6 explica):
+
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(32))"
+```
+
 ### 3. Executar
 
 Sempre a partir da raiz do repositório, com a `.venv` ativada e usando `python -m`:
@@ -122,7 +128,7 @@ A API grava cada documento recebido e a resposta da triagem. Onde isso é gravad
 | `local` (padrão) | Pasta `armazenamento_local/<bucket>/` no disco | Nenhuma | Quem desenvolve e o CI |
 | `oci` | Buckets do OCI Object Storage | Perfil do `~/.oci/config` (`OCI_AUTH=api_key`) ou da VM (`OCI_AUTH=instance_principal`) | Quem tem acesso à conta da OCI |
 
-**Se você não tem credencial da OCI, não faça nada: o modo `local` já é o padrão.** Com o `.env` copiado do `.env.example` (variáveis vazias), a API grava em disco. A pasta `armazenamento_local/` não vai para o Git.
+**Se você não tem credencial da OCI, não mexa nas variáveis da OCI: o modo `local` já é o padrão.** Com o `.env` copiado do `.env.example` (variáveis vazias), a API grava em disco. A chave de acesso (`MEDIFLOW_API_KEY`) continua obrigatória em qualquer modo. A pasta `armazenamento_local/` não vai para o Git.
 
 Para escolher o modo só em uma execução, sobrepondo o `.env` (Linux ou macOS):
 
@@ -173,10 +179,25 @@ d = json.load(open('dados_teste/2_urgencia/exemplo.json', encoding='utf-8'))['re
 d['documento_id'] = 'TESTE-001'
 print(json.dumps(d))
 " | curl -s -X POST http://localhost:8000/api/v1/triagem \
+  -H "X-API-Key: $MEDIFLOW_API_KEY" \
   -H "Content-Type: application/json" --data-binary @-
 ```
 
-A resposta traz `decisao_roteamento.destino_principal = "Fila_Emergencia_Medica"` e `armazenamento_oci.bucket = "mediflow-urgentes"`. Em qualquer sistema, também dá para testar pela interface interativa em `http://localhost:8000/docs`.
+A resposta traz `decisao_roteamento.destino_principal = "Fila_Emergencia_Medica"` e `armazenamento_oci.bucket = "mediflow-urgentes"`. Todas as rotas exigem a chave de acesso (seção 6), inclusive `/docs`: o navegador não manda o cabeçalho `X-API-Key`, então teste pelo `curl` ou por uma extensão que o envie.
+
+### 6. Chave de acesso e limites da API
+
+- **Chave de acesso:** toda requisição precisa do cabeçalho `X-API-Key` igual a `MEDIFLOW_API_KEY`. A única exceção é `GET /api/v1/saude` (o healthcheck do Docker). Sem a chave certa, a resposta é `401` e nada é gravado.
+- **A API não sobe sem a chave**, nem com menos de 32 caracteres (a mensagem de erro diz como gerar). Gere com `python -c "import secrets; print(secrets.token_urlsafe(32))"` e coloque o mesmo valor no `.env` local, no do servidor e no de quem mais rodar a API ou o painel. O painel Streamlit lê `MEDIFLOW_API_KEY` e manda o cabeçalho sozinho. Só para desenvolvimento, `MEDIFLOW_API_AUTH=desligada` sobe a API sem chave.
+- **Tamanho:** o corpo da requisição tem no máximo 15 MB (o mesmo `client_max_body_size 15M` do nginx); acima disso, `413`.
+- **Tetos por dia da triagem:** 100 documentos (`MEDIFLOW_TETO_DIARIO_DOCUMENTOS`) e 300 MB (`MEDIFLOW_TETO_DIARIO_MB`). Ao atingir um, `429`, sem gravar nada e sem chamar o Gemini. A contagem fica em memória e zera à meia-noite de `America/Sao_Paulo` e quando a API reinicia.
+
+| Código | Quando |
+|--------|--------|
+| `401` | `X-API-Key` ausente ou diferente de `MEDIFLOW_API_KEY` |
+| `413` | Corpo acima de 15 MB |
+| `429` | Teto diário de documentos ou de MB atingido |
+| `503` | Configuração de segurança inválida em tempo de requisição (por exemplo, um teto que não é número) |
 
 ---
 

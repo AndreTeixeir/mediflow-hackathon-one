@@ -20,6 +20,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfoNotFoundError
 
 import pytest
+from dotenv import dotenv_values
 from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
@@ -766,3 +767,15 @@ def test_teto_invalido_derruba_a_subida_e_na_requisicao_da_503(monkeypatch, novo
     resposta = novo_cliente().post("/api/v1/triagem", json=entrada_de_triagem())  # sem lifespan
     assert resposta.status_code == 503
     assert nada_gravado(tmp_path)
+
+
+# ============================================================================
+# Documentação da configuração
+# ============================================================================
+
+def test_o_env_example_documenta_as_quatro_variaveis_sem_nenhum_valor():
+    exemplo = dotenv_values(Path(__file__).resolve().parent.parent / ".env.example")
+
+    for variavel in ("MEDIFLOW_API_KEY", "MEDIFLOW_API_AUTH", "MEDIFLOW_TETO_DIARIO_DOCUMENTOS", "MEDIFLOW_TETO_DIARIO_MB"):
+        assert variavel in exemplo, f"{variavel} não está no .env.example"
+        assert exemplo[variavel] == "", f"{variavel} não pode ter valor no .env.example"
