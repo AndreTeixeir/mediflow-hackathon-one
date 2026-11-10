@@ -4,34 +4,43 @@ Hackathon ONE G10 - Grupo 10: MediFlow
 
 Mapeamento: interface/app.py
 Execução a partir da raiz: python -m streamlit run interface/app.py
+
+Tudo vem da API (MEDIFLOW_API_URL): o painel não lê arquivos de exemplo nem roda o grafo. A fila de auditoria,
+o histórico e os contadores são lidos da API, e a decisão de quem revisa é gravada por ela, então
+continua lá depois de recarregar a página. Se a API falhar, a tela mostra o erro e não simula resultado.
 """
 
 import base64
-import json
-import os
 import uuid
+from datetime import datetime
 
-import requests
 import streamlit as st
 from dotenv import load_dotenv
 
-from contratos.modelos import CanalOrigem, DestinoRoteamento
+from contratos.modelos import CanalOrigem
+from interface.cliente_api import TIMEOUT_DA_TRIAGEM_SEGUNDOS, ErroDaApi, chamar_api, url_da_api
 
 load_dotenv()
-
-API_BASE_URL = (
-    os.getenv("MEDIFLOW_API_URL", "http://localhost:8000").strip().rstrip("/")
-    or "http://localhost:8000"
-)
 
 # Limite do arquivo na tela, conferido antes de enviar. A API aceita 15 MB no corpo inteiro e o
 # Base64 incha o arquivo em cerca de 33%: 10 MB viram ~13,4 MB e ainda cabem.
 TAMANHO_MAXIMO_MB = 10
-# O pior caso da API é 3 chamadas ao Gemini de até 25 s mais as esperas (81 s): o timeout fica acima.
-TIMEOUT_API_SEGUNDOS = 90
 MODO_TEXTO = "Texto do documento"
 MODO_ARQUIVO = "Enviar arquivo PDF ou imagem"
 CANAIS_ORIGEM = [canal.value for canal in CanalOrigem]
+# A fila e o histórico mudam por fora (outra pessoa decide, a API recebe um documento): o painel os
+# relê a cada 30 s, e na hora quando esta sessão envia ou decide. No modo OCI, cada leitura de uma lista
+# são até 200 consultas ao armazenamento: o cache poupa a cota do Always Free.
+TTL_DO_CACHE_SEGUNDOS = 30
+# Os destinos de um documento aprovado (o bucket de rotina), para o contador: o nome do bucket depende do
+# prefixo configurado no servidor, o destino é do contrato.
+DESTINOS_DE_ROTINA = {"Farmacia_Hospitalar", "Auditoria_Autorizacoes", "Prontuario_Eletronico_do_Paciente"}
+# O rótulo na tela e o valor que a API espera.
+DESTINOS_DA_DECISAO = {"Rotina": "rotina", "Urgente": "urgente", "Rejeitar": "rejeitado"}
+LIMITE_DA_API = 200
+REVISOR_MAXIMO = 80
+JUSTIFICATIVA_MINIMA = 5
+JUSTIFICATIVA_MAXIMA = 500
 
 # Configuração visual da página
 st.set_page_config(
@@ -66,40 +75,54 @@ st.markdown("""
 
 
 # ============================================================================
-# ESTADO DA SESSÃO (BANCO LOCAL DE DOCUMENTOS PARA DEMONSTRAÇÃO)
+# DADOS DA API
 # ============================================================================
 
-def carregar_cenarios_iniciais():
-    """Carrega os 3 cenários oficiais de teste da pasta dados_teste."""
-    cenarios = []
-    raiz = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    pastas = ["1_rotina", "2_urgencia", "3_auditoria_humana"]
-    
-    for p in pastas:
-        caminho = os.path.join(raiz, "dados_teste", p, "exemplo.json")
-        if os.path.exists(caminho):
-            with open(caminho, "r", encoding="utf-8") as f:
-                dado = json.load(f)
-                cenarios.append(dado)
-    return cenarios
+@st.cache_data(ttl=TTL_DO_CACHE_SEGUNDOS, show_spinner=False)
+def carregar_pendentes(url: str) -> list:
+    """A fila de revisão humana. `url` entra na chave do cache: outro endereço, outra fila."""
+    return chamar_api("GET", "/api/v1/auditoria/pendentes")
 
 
-if "documentos_db" not in st.session_state:
-    raw_data = carregar_cenarios_iniciais()
-    st.session_state.documentos_db = []
-    for item in raw_data:
-        req = item.get("requisicao_entrada", {})
-        resp = item.get("resposta_esperada", {})
-        st.session_state.documentos_db.append({
-            "requisicao": req,
-            "triagem": resp,
-            "cenario_nome": item.get("cenario", ""),
-            "descricao": item.get("descricao", "")
-        })
+@st.cache_data(ttl=TTL_DO_CACHE_SEGUNDOS, show_spinner=False)
+def carregar_historico(url: str) -> list:
+    """O histórico dos buckets de rotina, urgentes, auditoria humana e rejeitados."""
+    return chamar_api("GET", "/api/v1/documentos")
 
-if "historico_auditorias" not in st.session_state:
-    st.session_state.historico_auditorias = []
 
+def recarregar_dados() -> None:
+    """Esquece o que está em cache: a próxima leitura vai à API."""
+    st.cache_data.clear()
+
+
+def ler(carregar):
+    """(dados, None) ou (None, erro): quem chama decide onde mostrar a mensagem."""
+    try:
+        return carregar(url_da_api()), None
+    except ErroDaApi as erro:
+        return None, erro
+
+
+def mostrar_erro(erro: ErroDaApi) -> None:
+    st.error(erro.mensagem)
+    if erro.endereco:
+        st.write(f"Endereço tentado: `{erro.endereco}`")
+        st.info("Inicie a API FastAPI ou confira a variável MEDIFLOW_API_URL.")
+    if erro.status == 422 and erro.corpo is not None:
+        st.json(erro.corpo)
+
+
+def formatar_data(data_iso: str) -> str:
+    """A data que a API devolve (ISO 8601, UTC) como o painel a mostra."""
+    try:
+        return datetime.fromisoformat(data_iso.replace("Z", "+00:00")).strftime("%d/%m/%Y %H:%M (UTC)")
+    except ValueError:
+        return data_iso
+
+
+# ============================================================================
+# ID E ARQUIVO DA ABA DE ENVIO
+# ============================================================================
 
 def gerar_novo_id() -> None:
     """Gera um ID e o mantém no estado da sessão. Roda como on_click, antes de o campo ser redesenhado."""
@@ -116,83 +139,16 @@ def tipo_pela_extensao(nome_arquivo: str) -> str:
     return nome_arquivo.rsplit(".", 1)[-1].upper()
 
 
-def enviar_triagem(payload: dict) -> dict | None:
-    """Envia o documento à API. Devolve a resposta, ou None depois de mostrar o erro na tela.
-
-    Nenhum resultado é simulado: se a API não responder 200, não há triagem.
-    """
-    endereco = f"{API_BASE_URL}/api/v1/triagem"
-    try:
-        with st.spinner("Enviando documento para a API MediFlow..."):
-            resposta = requests.post(endereco, json=payload, timeout=TIMEOUT_API_SEGUNDOS)
-    except requests.exceptions.ConnectionError:
-        st.error("Não foi possível conectar à API.")
-        st.write(f"Endereço tentado: `{endereco}`")
-        st.info("Inicie a API FastAPI ou confira a variável MEDIFLOW_API_URL.")
-        return None
-    except requests.exceptions.Timeout:
-        st.error("A API demorou demais para responder. Tente novamente ou verifique os logs do back-end.")
-        return None
-    except requests.exceptions.RequestException as erro:
-        st.error(f"Erro na comunicação com a API ({type(erro).__name__}).")
-        return None
-
-    if resposta.status_code == 200:
-        try:
-            return resposta.json()
-        except ValueError:
-            st.error("A resposta da API não veio em JSON válido.")
-            return None
-
-    if resposta.status_code == 409:
-        st.error('Já existe um documento com esse ID. Clique em "Gerar novo ID" e envie de novo.')
-    elif resposta.status_code == 422:
-        st.error("A API recusou os dados enviados (HTTP 422).")
-        try:
-            st.json(resposta.json())
-        except ValueError:
-            st.code(resposta.text[:1000])
-    elif resposta.status_code == 503:
-        st.error("O armazenamento está indisponível no momento (HTTP 503). Tente de novo em instantes.")
-    else:
-        st.error(f"A API respondeu com HTTP {resposta.status_code}.")
-        st.code(resposta.text[:1000])
-    return None
-
-
 # ============================================================================
-# CABEÇALHO & MÉTRICAS
+# CABEÇALHO E CONTADORES (preenchidos no fim do script, depois de enviar ou decidir)
 # ============================================================================
 
 st.markdown('<div class="titulo-principal">🏥 MediFlow — Triagem e Auditoria Clínica</div>', unsafe_allow_html=True)
 st.markdown('<div class="subtitulo">Agente Autônomo para Triagem, Extração e Roteamento de Documentos Clínicos | OCI Always Free</div>', unsafe_allow_html=True)
 
-# Métricas no topo
-total_docs = len(st.session_state.documentos_db)
-pendentes = sum(
-    1 for d in st.session_state.documentos_db 
-    if d["triagem"].get("status") == "pendente_auditoria" 
-    or d["triagem"]["decisao_roteamento"].get("requer_auditoria_humana")
-)
-urgentes = sum(
-    1 for d in st.session_state.documentos_db 
-    if d["triagem"]["classificacao"].get("nivel_prioridade") in ["Urgente", "Emergência"]
-)
-aprovados = sum(
-    1 for d in st.session_state.documentos_db 
-    if d["triagem"].get("status") == "processado" 
-    and not d["triagem"]["decisao_roteamento"].get("requer_auditoria_humana")
-)
-
-col_m1, col_m2, col_m3, col_m4 = st.columns(4)
-with col_m1:
-    st.metric(label="📄 Total de Documentos", value=total_docs)
-with col_m2:
-    st.metric(label="⚠️ Fila de Revisão Humana", value=pendentes, delta=f"{pendentes} retidos", delta_color="inverse")
-with col_m3:
-    st.metric(label="🚨 Emergências Médicas", value=urgentes)
-with col_m4:
-    st.metric(label="✅ Roteados Automaticamente", value=aprovados)
+# O Streamlit desenha na ordem do script. Os contadores ficam no topo da tela mas são preenchidos
+# no fim, depois de uma triagem enviada ou de uma decisão registrada nesta mesma execução.
+area_dos_contadores = st.container()
 
 st.divider()
 
@@ -209,149 +165,8 @@ tab_auditoria, tab_envio, tab_historico = st.tabs([
 
 
 # ----------------------------------------------------------------------------
-# ABA 1: PAINEL DE AUDITORIA HUMANA (RESPONSABILIDADE DA LETHICIA)
-# ----------------------------------------------------------------------------
-with tab_auditoria:
-    docs_pendentes = [
-        d for d in st.session_state.documentos_db 
-        if d["triagem"].get("status") == "pendente_auditoria" 
-        or d["triagem"]["decisao_roteamento"].get("requer_auditoria_humana")
-    ]
-
-    if not docs_pendentes:
-        st.success("🎉 Não há documentos pendentes na fila de auditoria humana no momento!")
-        st.info("Todos os laudos e receitas com alta confiabilidade foram triados e roteados automaticamente.")
-    else:
-        st.subheader(f"📋 Documentos Retidos para Revisão ({len(docs_pendentes)})")
-        
-        opcoes = [
-            f"{d['triagem']['documento_id']} — {d['triagem']['classificacao']['tipo_documento']} ({d['cenario_nome']})" 
-            for d in docs_pendentes
-        ]
-        escolha_idx = st.selectbox("Selecione o caso para auditar:", range(len(opcoes)), format_func=lambda i: opcoes[i])
-        
-        doc_selecionado = docs_pendentes[escolha_idx]
-        req = doc_selecionado["requisicao"]
-        tri = doc_selecionado["triagem"]
-        dados_ext = tri.get("dados_extraidos", {})
-        paciente = dados_ext.get("paciente", {}) or {}
-        medico = dados_ext.get("medico_solicitante", {}) or {}
-        decisao = tri.get("decisao_roteamento", {})
-        classif = tri.get("classificacao", {})
-
-        col_esq, col_dir = st.columns([1, 1.2])
-
-        # Coluna da esquerda: O que o sistema recebeu e o motivo do alerta
-        with col_esq:
-            st.markdown("### 📄 Documento Recebido")
-            st.markdown(f"**ID do Documento:** `{tri.get('documento_id')}`")
-            st.markdown(f"**Canal de Origem:** `{req.get('canal_origem', 'Ambulatorio')}`")
-            st.markdown(f"**Formato:** `{req.get('tipo_arquivo', 'PDF')}`")
-            
-            st.warning(f"**Motivo da Retenção para Auditoria:**\n{decisao.get('justificativa_roteamento')}")
-
-            st.text_area(
-                label="Texto Transcrito do Documento (OCR / LLM):",
-                value=req.get("documento_texto", "Nenhum texto disponível"),
-                height=260,
-                disabled=True
-            )
-
-            score = classif.get("score_confianca_classificacao", 0.0)
-            st.markdown(f"**Score de Confiança da Extração:** `{score * 100:.1f}%`")
-            st.progress(score)
-
-        # Coluna da direita: Formulário interativo para o especialista corrigir
-        with col_dir:
-            st.markdown("### ✍️ Formulário de Revisão Clínica")
-            st.caption("O auditor confere e corrige as entidades clínicas antes de liberar o roteamento.")
-
-            with st.form(key=f"form_auditoria_{tri.get('documento_id')}"):
-                c_p1, c_p2 = st.columns([2, 1])
-                with c_p1:
-                    novo_nome = st.text_input("Nome do Paciente:", value=paciente.get("nome") or "")
-                with c_p2:
-                    nova_idade = st.number_input("Idade:", value=int(paciente.get("idade") or 0), min_value=0, max_value=120)
-
-                c_m1, c_m2 = st.columns([2, 1])
-                with c_m1:
-                    novo_medico = st.text_input("Médico Solicitante:", value=medico.get("nome") or "")
-                with c_m2:
-                    novo_crm = st.text_input("CRM com UF:", value=medico.get("crm") or "")
-
-                novo_diag = st.text_input("Diagnóstico Principal:", value=dados_ext.get("diagnostico_principal") or "")
-                novo_cid = st.text_input("CID-10 Sugerido:", value=dados_ext.get("cid_sugerido") or "")
-
-                st.markdown("**Destino Hospitalar:**")
-                destinos_lista = [d.value for d in DestinoRoteamento]
-                novo_destino = st.selectbox(
-                    "Encaminhar para o departamento:",
-                    destinos_lista,
-                    index=destinos_lista.index("Farmacia_Hospitalar") if "Farmacia_Hospitalar" in destinos_lista else 0
-                )
-
-                nome_auditor = st.text_input("Auditor Responsável:", value="Lethicia - Auditora Clínica")
-                parecer = st.text_area("Justificativa do Parecer:", value="Dados conferidos manualmente com a receita original. Erros de dosagem descartados.")
-
-                col_btn1, col_btn2 = st.columns(2)
-                with col_btn1:
-                    btn_aprovar = st.form_submit_button("✅ Aprovar e Liberar Roteamento", use_container_width=True)
-                with col_btn2:
-                    btn_rejeitar = st.form_submit_button("❌ Rejeitar Documento", use_container_width=True)
-
-            if btn_aprovar:
-                # Atualiza os dados com a correção humana
-                paciente["nome"] = novo_nome
-                paciente["idade"] = nova_idade
-                medico["nome"] = novo_medico
-                medico["crm"] = novo_crm
-                dados_ext["diagnostico_principal"] = novo_diag
-                dados_ext["cid_sugerido"] = novo_cid
-                
-                # Atualiza a decisão
-                tri["status"] = "processado"
-                decisao["requer_auditoria_humana"] = False
-                decisao["destino_principal"] = novo_destino
-                decisao["justificativa_roteamento"] = f"Aprovado por auditoria humana ({nome_auditor}). Parecer: {parecer}"
-                classif["score_confianca_classificacao"] = 1.0
-                
-                if tri.get("armazenamento_oci"):
-                    tri["armazenamento_oci"]["bucket"] = "mediflow-rotina"
-                    tri["armazenamento_oci"]["caminho_objeto"] = f"{tri['documento_id']}.json"
-
-                st.session_state.historico_auditorias.append({
-                    "documento_id": tri["documento_id"],
-                    "auditor": nome_auditor,
-                    "acao": "APROVADO",
-                    "destino_final": novo_destino,
-                    "parecer": parecer
-                })
-
-                st.success(f"Documento {tri['documento_id']} corrigido e aprovado! Encaminhado para {novo_destino}.")
-                st.rerun()
-
-            elif btn_rejeitar:
-                tri["status"] = "rejeitado"
-                decisao["requer_auditoria_humana"] = False
-                decisao["justificativa_roteamento"] = f"Rejeitado por auditoria ({nome_auditor}). Motivo: {parecer}"
-                
-                if tri.get("armazenamento_oci"):
-                    tri["armazenamento_oci"]["bucket"] = "mediflow-rejeitados"
-
-                st.session_state.historico_auditorias.append({
-                    "documento_id": tri["documento_id"],
-                    "auditor": nome_auditor,
-                    "acao": "REJEITADO",
-                    "destino_final": "Descartado",
-                    "parecer": parecer
-                })
-
-                st.warning(f"Documento {tri['documento_id']} rejeitado.")
-                st.rerun()
-
-
-# ----------------------------------------------------------------------------
 # ABA 2: ENVIO E TRIAGEM (lógica de envio da página do Guilherme, no visual da Lethicia)
+# Vem primeiro no código para o envio limpar o cache antes de a fila e o histórico serem lidos.
 # ----------------------------------------------------------------------------
 with tab_envio:
     st.subheader("📤 Enviar Documento para Triagem")
@@ -389,7 +204,7 @@ with tab_envio:
         canal_input = st.selectbox("Canal de Origem:", CANAIS_ORIGEM, key="canal_envio")
 
     if st.button("🚀 Processar Triagem Automática", type="primary", width="stretch", key="btn_processar"):
-        # if/elif em vez de st.stop(): o stop interromperia o script e a aba de histórico sumiria.
+        # if/elif em vez de st.stop(): o stop interromperia o script e as outras abas sumiriam.
         if modo_envio == MODO_TEXTO and not texto_input.strip():
             st.error("Insira o texto do documento antes de enviar.")
         elif modo_envio == MODO_ARQUIVO and arquivo_upload is None:
@@ -399,38 +214,28 @@ with tab_envio:
         else:
             payload = {"documento_id": doc_id_input, "canal_origem": canal_input}
             if arquivo_upload is not None:
-                tipo_arq = tipo_pela_extensao(arquivo_upload.name)
                 # A API recebe o arquivo em Base64 dentro do JSON.
-                payload["tipo_arquivo"] = tipo_arq
+                payload["tipo_arquivo"] = tipo_pela_extensao(arquivo_upload.name)
                 payload["documento_base64"] = base64.b64encode(arquivo_upload.getvalue()).decode("ascii")
             else:
-                tipo_arq = "TXT"
-                payload["tipo_arquivo"] = tipo_arq
+                payload["tipo_arquivo"] = "TXT"
                 payload["documento_texto"] = texto_input
 
-            resultado = enviar_triagem(payload)
-
-            if resultado is not None:
+            try:
+                with st.spinner("Enviando documento para a API MediFlow..."):
+                    resultado = chamar_api(
+                        "POST",
+                        "/api/v1/triagem",
+                        json=payload,
+                        timeout=TIMEOUT_DA_TRIAGEM_SEGUNDOS,
+                        mensagens={409: 'Já existe um documento com esse ID. Clique em "Gerar novo ID" e envie de novo.'},
+                    )
+            except ErroDaApi as erro:
+                mostrar_erro(erro)
+            else:
                 st.success("✅ Triagem processada com sucesso via API FastAPI + Grafo LangGraph!")
+                recarregar_dados()  # a fila, o histórico e os contadores passam a incluir este documento
 
-                # Só uma triagem que a API confirmou entra no banco da sessão.
-                novo_registro = {
-                    "requisicao": {
-                        "documento_id": doc_id_input,
-                        "tipo_arquivo": tipo_arq,
-                        "documento_texto": texto_input or f"[Arquivo {tipo_arq} enviado via upload]",
-                        "canal_origem": canal_input,
-                    },
-                    "triagem": resultado,
-                    "cenario_nome": "Envio pela tela",
-                    "descricao": "Documento processado durante a sessão.",
-                }
-                st.session_state.documentos_db = [
-                    d for d in st.session_state.documentos_db
-                    if d["triagem"].get("documento_id") != doc_id_input
-                ] + [novo_registro]
-
-                # Exibe resultado detalhado
                 st.markdown("### Resultado da Triagem:")
                 col_r1, col_r2 = st.columns(2)
                 with col_r1:
@@ -441,22 +246,183 @@ with tab_envio:
 
 
 # ----------------------------------------------------------------------------
+# ABA 1: PAINEL DE AUDITORIA HUMANA (RESPONSABILIDADE DA LETHICIA)
+# ----------------------------------------------------------------------------
+def validar_decisao(revisor: str, justificativa: str):
+    """A mensagem do que falta preencher, ou None. A API confere de novo."""
+    if not revisor.strip():
+        return "Informe o nome de quem revisa."
+    if len(revisor.strip()) > REVISOR_MAXIMO:
+        return f"O nome de quem revisa passa de {REVISOR_MAXIMO} caracteres."
+    if len(justificativa.strip()) < JUSTIFICATIVA_MINIMA:
+        return f"A justificativa é obrigatória e precisa ter pelo menos {JUSTIFICATIVA_MINIMA} caracteres."
+    if len(justificativa.strip()) > JUSTIFICATIVA_MAXIMA:
+        return f"A justificativa passa de {JUSTIFICATIVA_MAXIMA} caracteres."
+    return None
+
+
+def registrar_decisao(documento_id: str, destino: str, revisor: str, justificativa: str) -> None:
+    """Envia a decisão. Se a API aceitar, relê a fila por ela; se não, mostra o erro e não muda nada."""
+    try:
+        resposta = chamar_api(
+            "POST",
+            f"/api/v1/auditoria/{documento_id}/decisao",
+            json={"destino": DESTINOS_DA_DECISAO[destino], "revisor": revisor.strip(), "justificativa": justificativa.strip()},
+        )
+    except ErroDaApi as erro:
+        if erro.status == 404:
+            # Outra pessoa já decidiu (ou o documento saiu da fila): relê a fila e avisa.
+            recarregar_dados()
+            st.session_state["aviso_da_decisao"] = ("warning", f"{erro.mensagem} A fila foi atualizada.")
+            st.rerun()
+        mostrar_erro(erro)
+        return
+
+    destino_final = resposta["decisao_roteamento"]["destino_principal"]
+    bucket = resposta["armazenamento_oci"]["bucket"]
+    st.session_state["aviso_da_decisao"] = (
+        "success",
+        f"Documento {documento_id} encaminhado para {destino_final} (bucket {bucket}). A decisão ficou registrada.",
+    )
+    recarregar_dados()
+    st.rerun()
+
+
+with tab_auditoria:
+    aviso = st.session_state.pop("aviso_da_decisao", None)
+    if aviso:
+        getattr(st, aviso[0])(aviso[1])
+
+    st.button("🔄 Atualizar a fila", on_click=recarregar_dados, key="btn_atualizar")
+    pendentes, erro_da_fila = ler(carregar_pendentes)
+
+    if erro_da_fila:
+        mostrar_erro(erro_da_fila)
+    elif not pendentes:
+        st.success("🎉 Não há documentos pendentes na fila de auditoria humana no momento!")
+        st.info("Todos os laudos e receitas com alta confiabilidade foram triados e roteados automaticamente.")
+    else:
+        st.subheader(f"📋 Documentos Retidos para Revisão ({len(pendentes)})")
+        por_id = {p["documento_id"]: p for p in pendentes}
+        documento_id = st.selectbox(
+            "Selecione o caso para auditar:",
+            list(por_id),
+            format_func=lambda i: f"{i} — {por_id[i]['tipo_documento']} (prioridade {por_id[i]['nivel_prioridade']})",
+            key="caso_em_auditoria",
+        )
+        doc = por_id[documento_id]
+        dados_ext = doc.get("dados_extraidos") or {}
+        paciente = dados_ext.get("paciente") or {}
+        medico = dados_ext.get("medico_solicitante") or {}
+
+        col_esq, col_dir = st.columns([1, 1.2])
+
+        # Coluna da esquerda: o que o sistema decidiu e o motivo da retenção
+        with col_esq:
+            st.markdown("### 📄 Documento Retido")
+            st.markdown(f"**ID do Documento:** `{doc['documento_id']}`")
+            st.markdown(f"**Tipo:** {doc['tipo_documento']}")
+            st.markdown(f"**Prioridade:** {doc['nivel_prioridade']}")
+            st.markdown(f"**Entrou na fila em:** {formatar_data(doc['data'])}")
+
+            st.warning(f"**Motivo da Retenção para Auditoria:**\n{doc['justificativa_roteamento']}")
+
+            score = doc["score_confianca_classificacao"]
+            st.markdown(f"**Score de Confiança da Extração:** `{score * 100:.1f}%`")
+            st.progress(score)
+
+        # Coluna da direita: dados extraídos (somente leitura) e a decisão de quem revisa
+        with col_dir:
+            st.markdown("### ✍️ Formulário de Revisão Clínica")
+
+            with st.form(key=f"form_auditoria_{documento_id}"):
+                st.caption("Dados extraídos pela IA, como a API os devolveu.")
+                st.warning("Correção de dados será habilitada numa próxima versão")
+                c_p1, c_p2 = st.columns([2, 1])
+                with c_p1:
+                    st.text_input("Nome do Paciente:", value=paciente.get("nome") or "", disabled=True, key=f"nome_{documento_id}")
+                with c_p2:
+                    st.text_input("Idade:", value=str(paciente.get("idade") or ""), disabled=True, key=f"idade_{documento_id}")
+
+                c_m1, c_m2 = st.columns([2, 1])
+                with c_m1:
+                    st.text_input("Médico Solicitante:", value=medico.get("nome") or "", disabled=True, key=f"medico_{documento_id}")
+                with c_m2:
+                    st.text_input("CRM com UF:", value=medico.get("crm") or "", disabled=True, key=f"crm_{documento_id}")
+
+                st.text_input(
+                    "Diagnóstico Principal:", value=dados_ext.get("diagnostico_principal") or "", disabled=True, key=f"diag_{documento_id}"
+                )
+                st.text_input("CID-10 Sugerido:", value=dados_ext.get("cid_sugerido") or "", disabled=True, key=f"cid_{documento_id}")
+
+                st.markdown("**Decisão de quem revisa:**")
+                destino = st.radio("Encaminhar para:", list(DESTINOS_DA_DECISAO), horizontal=True, key=f"destino_{documento_id}")
+                revisor = st.text_input("Nome de quem revisa (obrigatório):", max_chars=REVISOR_MAXIMO, key="nome_do_revisor")
+                justificativa = st.text_area(
+                    f"Justificativa (obrigatória, de {JUSTIFICATIVA_MINIMA} a {JUSTIFICATIVA_MAXIMA} caracteres):",
+                    max_chars=JUSTIFICATIVA_MAXIMA,
+                    key=f"justificativa_{documento_id}",
+                )
+
+                registrar = st.form_submit_button("✅ Registrar decisão", type="primary", width="stretch")
+
+            if registrar:
+                pendencia = validar_decisao(revisor, justificativa)
+                if pendencia:
+                    st.error(pendencia)
+                else:
+                    registrar_decisao(documento_id, destino, revisor, justificativa)
+
+
+# ----------------------------------------------------------------------------
 # ABA 3: HISTÓRICO & BUCKETS OCI
 # ----------------------------------------------------------------------------
 with tab_historico:
-    st.subheader("📦 Visualização do Armazenamento OCI (Object Storage)")
+    st.subheader("📦 Histórico dos Documentos no Armazenamento")
     st.caption("Organização segregada de arquivos conforme exigido pelo edital Always Free da Oracle.")
 
-    for item in st.session_state.documentos_db:
-        t = item["triagem"]
-        oci = t.get("armazenamento_oci", {})
-        status_txt = "🟢 Processado" if t.get("status") == "processado" else "🟠 Pendente Auditoria"
-        if t["classificacao"].get("nivel_prioridade") == "Urgente":
-            status_txt += " | 🚨 Urgente"
+    historico, erro_do_historico = ler(carregar_historico)
+    if erro_do_historico:
+        mostrar_erro(erro_do_historico)
+    elif not historico:
+        st.info("Nenhum documento no armazenamento ainda.")
+    else:
+        if len(historico) >= LIMITE_DA_API:
+            st.caption(f"Os {LIMITE_DA_API} documentos mais recentes.")
+        st.dataframe(
+            [
+                {
+                    "Data": formatar_data(h["data"]),
+                    "Documento": h["documento_id"],
+                    "Status": h["status"],
+                    "Prioridade": h["nivel_prioridade"],
+                    "Destino": h["destino_principal"],
+                    "Bucket": h["bucket"],
+                }
+                for h in historico
+            ],
+            width="stretch",
+            hide_index=True,
+        )
 
-        with st.expander(f"{t.get('documento_id')} — {status_txt} — Bucket: {oci.get('bucket')}"):
-            st.json(t)
 
-    if st.session_state.historico_auditorias:
-        st.subheader("📝 Histórico de Intervenções Humanas:")
-        st.table(st.session_state.historico_auditorias)
+# ----------------------------------------------------------------------------
+# CONTADORES DO TOPO: vêm da API, lidos depois de enviar ou decidir nesta execução
+# ----------------------------------------------------------------------------
+with area_dos_contadores:
+    historico, _ = ler(carregar_historico)
+    pendentes, _ = ler(carregar_pendentes)
+    if historico is None or pendentes is None:
+        st.warning("Contadores indisponíveis: a API não respondeu. O motivo aparece nas abas abaixo.")
+    else:
+        col_m1, col_m2, col_m3, col_m4, col_m5 = st.columns(5)
+        with col_m1:
+            st.metric(label="📄 Total de Documentos", value=len(historico))
+        with col_m2:
+            st.metric(label="⚠️ Fila de Revisão Humana", value=len(pendentes))
+        with col_m3:
+            st.metric(label="🚨 Emergências Médicas", value=sum(1 for h in historico if h["destino_principal"] == "Fila_Emergencia_Medica"))
+        with col_m4:
+            st.metric(label="✅ Rotina", value=sum(1 for h in historico if h["destino_principal"] in DESTINOS_DE_ROTINA))
+        with col_m5:
+            st.metric(label="🚫 Rejeitados", value=sum(1 for h in historico if h["status"] == "rejeitado"))
