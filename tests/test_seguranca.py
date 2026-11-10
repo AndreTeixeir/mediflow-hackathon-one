@@ -13,6 +13,10 @@ import asyncio
 import base64
 import json
 import logging
+import os
+import re
+import subprocess
+import sys
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
@@ -706,6 +710,48 @@ def test_sem_a_base_de_fusos_o_dia_vira_em_utc_menos_3_e_a_api_avisa(monkeypatch
     assert contador.tentar_registrar(1, 1, 100) == "documentos"
     estado["agora"] = utc(2026, 11, 11, 3, 0)
     assert contador.tentar_registrar(1, 1, 100) is None
+
+
+def rodar_sem_a_base_de_fusos_do_sistema(tmp_path, codigo):
+    """Roda `codigo` num processo que simula a imagem python:3.13-slim: sem a base de fusos do sistema, só o
+    que vier com o pacote tzdata. PYTHONTZPATH aponta para uma pasta vazia."""
+    pasta_vazia = tmp_path / "sem-fusos"
+    pasta_vazia.mkdir()
+    return subprocess.run(
+        [sys.executable, "-c", codigo],
+        env={**os.environ, "PYTHONTZPATH": str(pasta_vazia)},
+        cwd=Path(__file__).resolve().parent.parent,  # para importar api.seguranca
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+
+
+def test_o_zoneinfo_acha_sao_paulo_sem_a_base_do_sistema_porque_o_tzdata_esta_instalado(tmp_path):
+    resultado = rodar_sem_a_base_de_fusos_do_sistema(
+        tmp_path, "from zoneinfo import ZoneInfo; print(ZoneInfo('America/Sao_Paulo'))"
+    )
+
+    assert resultado.returncode == 0, resultado.stderr
+    assert resultado.stdout.strip() == "America/Sao_Paulo"
+
+
+def test_o_contador_diario_usa_o_fuso_de_verdade_e_nao_o_utc_menos_3_de_reserva_na_imagem_slim(tmp_path):
+    resultado = rodar_sem_a_base_de_fusos_do_sistema(
+        tmp_path,
+        "import logging; logging.basicConfig(level=logging.WARNING); "
+        "from api.seguranca import ContadorDiario; print(type(ContadorDiario()._fuso).__name__)",
+    )
+
+    assert resultado.returncode == 0, resultado.stderr
+    assert resultado.stdout.strip() == "ZoneInfo"  # o de reserva seria "timezone"
+    assert "UTC-3 fixo" not in resultado.stderr  # e o aviso de reserva não foi emitido
+
+
+def test_o_requirements_fixa_a_versao_do_tzdata():
+    requirements = (Path(__file__).resolve().parent.parent / "requirements.txt").read_text(encoding="utf-8")
+
+    assert re.search(r"^tzdata==\d{4}\.\d+$", requirements, flags=re.MULTILINE)
 
 
 def test_o_contador_nunca_passa_do_teto_com_varias_threads_ao_mesmo_tempo():

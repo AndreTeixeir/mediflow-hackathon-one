@@ -21,6 +21,11 @@ pillow==12.3.0
 # Configuração
 python-dotenv==1.2.4
 
+# Fusos horários
+# A imagem python:3.13-slim não traz a base de fusos do sistema; sem ela, o teto diário da API
+# (api/seguranca.py) cairia para UTC-3 fixo. O pacote leva a base junto e o zoneinfo o usa sozinho.
+tzdata==2026.6
+
 # Testes
 pytest==9.1.1
 
