@@ -9,10 +9,13 @@ Mapeamento: agente/visao_multimodal.py
 import logging
 import os
 import re
+import time
 from typing import Optional, Tuple
 
+import httpx
 from dotenv import load_dotenv
 from google import genai
+from google.genai import errors as erros_genai
 from google.genai import types
 
 from agente.leitor_documentos import ConteudoDocumentoIngerido
@@ -31,12 +34,72 @@ from prompts.extracao_clinica import (
     SYSTEM_PROMPT_MEDIFLOW,
     montar_prompt_extracao_texto,
 )
+from regras.regras_clinicas import UFS_VALIDAS
 
 load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-MODELO_GEMINI_PADRAO = os.getenv("LLM_MODEL", "gemini-2.5-flash").strip() or "gemini-2.5-flash"
+# O gemini-2.5-flash não está mais disponível para chaves novas (a API responde 404).
+# O gemini-3.5-flash-lite foi testado com texto, PNG e PDF escaneado.
+MODELO_GEMINI_DEFAULT = "gemini-3.5-flash-lite"
+
+
+def resolver_modelo(valor_do_ambiente: Optional[str]) -> str:
+    """O modelo de LLM_MODEL; vazio ou só espaços vale o padrão."""
+    return (valor_do_ambiente or "").strip() or MODELO_GEMINI_DEFAULT
+
+
+MODELO_GEMINI_PADRAO = resolver_modelo(os.getenv("LLM_MODEL"))
+
+# Falha transitória (modelo sob alta demanda, rede lenta): a chamada é repetida. A original mais
+# 2 novas tentativas, com espera de 2 e 4 segundos. 429 (cota) e os demais erros 4xx não são
+# repetidos: repetir não resolve e gasta a cota. Depois da última falha, vale o fallback.
+TENTATIVAS_MAXIMAS = 3
+ESPERAS_ENTRE_TENTATIVAS_SEGUNDOS = (2, 4)
+CODIGOS_HTTP_TRANSITORIOS = frozenset({500, 503, 504})
+# Sem prazo, uma conexão presa nunca vira "timeout" e a nova tentativa nunca acontece. No pior caso,
+# 3 chamadas de 25 s mais as esperas somam 81 s: cabe nos 90 s que o painel espera pela API.
+TIMEOUT_CHAMADA_MS = 25_000
+
+
+def _dormir(segundos: float) -> None:
+    time.sleep(segundos)
+
+
+def _falha_transitoria(erro: Exception) -> bool:
+    if isinstance(erro, erros_genai.APIError):
+        return erro.code in CODIGOS_HTTP_TRANSITORIOS
+    return isinstance(erro, httpx.TimeoutException)
+
+
+def _descrever_falha(erro: Exception) -> str:
+    """O tipo da exceção e, quando houver, o código HTTP. Nunca a mensagem: num ValidationError
+    da resposta, ela traz trechos do que o modelo devolveu, ou seja, dados do paciente."""
+    codigo = getattr(erro, "code", None)
+    if isinstance(codigo, int):
+        return f"{type(erro).__name__}, HTTP {codigo}"
+    return type(erro).__name__
+
+
+def _gerar_conteudo_com_tentativas(cliente, modelo: str, conteudos: list, configuracao: types.GenerateContentConfig):
+    """Chama o modelo e repete a chamada em falha transitória. Relança a última falha."""
+    for tentativa in range(1, TENTATIVAS_MAXIMAS + 1):
+        try:
+            return cliente.models.generate_content(model=modelo, contents=conteudos, config=configuracao)
+        except Exception as erro:
+            if tentativa == TENTATIVAS_MAXIMAS or not _falha_transitoria(erro):
+                raise
+            espera = ESPERAS_ENTRE_TENTATIVAS_SEGUNDOS[tentativa - 1]
+            logger.warning(
+                "Falha transitória na chamada ao modelo Gemini %s (%s). Nova tentativa %d de %d em %d s.",
+                modelo,
+                _descrever_falha(erro),
+                tentativa + 1,
+                TENTATIVAS_MAXIMAS,
+                espera,
+            )
+            _dormir(espera)
 
 
 def obter_chave_llm() -> Optional[str]:
@@ -79,8 +142,22 @@ def _extrair_paciente_heuristico(texto: str) -> Paciente:
     return Paciente(nome=nome, idade=idade)
 
 
+# CRM-SP 123456, CRM/SP 123456, CRM 123456-SP, CRM 123456/SP ou CRM 123456 (sem UF).
+_PADRAO_CRM = re.compile(
+    r"\bCRM\s*[-/]?\s*(?:([A-Z]{2})\b)?\s*[:\-]?\s*(\d{3,8})(?:\s*[-/]\s*([A-Z]{2})\b)?",
+    flags=re.IGNORECASE,
+)
+
+
+def _formatar_crm(encontrado: re.Match) -> str:
+    """NUMERO-UF quando o texto traz uma UF válida; só NUMERO quando não traz. Nunca presume a UF."""
+    uf_antes, numero, uf_depois = encontrado.groups()
+    uf = next((u.upper() for u in (uf_antes, uf_depois) if u and u.upper() in UFS_VALIDAS), None)
+    return f"{numero}-{uf}" if uf else numero
+
+
 def _extrair_medico_heuristico(texto: str) -> MedicoSolicitante:
-    """Extrai nome do médico e CRM padronizado no formato NUMERO-UF."""
+    """Extrai nome do médico e CRM no formato NUMERO-UF (só NUMERO se o texto não trouxer a UF)."""
     nome_med: Optional[str] = None
     crm_fmt: Optional[str] = None
 
@@ -91,11 +168,9 @@ def _extrair_medico_heuristico(texto: str) -> MedicoSolicitante:
     )
     if match_med:
         trecho_med = match_med.group(1).strip(" .")
-        match_crm = re.search(r"CRM(?:-|\s*)([A-Z]{2})?\s*[:\-]?\s*(\d{3,8})(?:-([A-Z]{2}))?", trecho_med, flags=re.IGNORECASE)
+        match_crm = _PADRAO_CRM.search(trecho_med)
         if match_crm:
-            uf = (match_crm.group(1) or match_crm.group(3) or "SP").upper()
-            num = match_crm.group(2)
-            crm_fmt = f"{num}-{uf}"
+            crm_fmt = _formatar_crm(match_crm)
             nome_med = trecho_med[: match_crm.start()].strip(" -.,")
         else:
             if any(termo in trecho_med.lower() for termo in ["ilegível", "rasurado", "borrado"]):
@@ -105,13 +180,24 @@ def _extrair_medico_heuristico(texto: str) -> MedicoSolicitante:
                 nome_med = trecho_med.strip(" .,-")
 
     if not crm_fmt:
-        match_crm_global = re.search(r"CRM(?:-|\s*)([A-Z]{2})?\s*[:\-]?\s*(\d{3,8})(?:-([A-Z]{2}))?", texto, flags=re.IGNORECASE)
+        match_crm_global = _PADRAO_CRM.search(texto)
         if match_crm_global:
-            uf = (match_crm_global.group(1) or match_crm_global.group(3) or "SP").upper()
-            num = match_crm_global.group(2)
-            crm_fmt = f"{num}-{uf}"
+            crm_fmt = _formatar_crm(match_crm_global)
 
     return MedicoSolicitante(nome=nome_med, crm=crm_fmt)
+
+
+def classificacao_nao_identificada() -> Tuple[ClassificacaoDocumento, DadosExtraidos]:
+    """Documento sem tipo reconhecido: score 0.0 e nenhum dado extraído (vai para a revisão humana)."""
+    return (
+        ClassificacaoDocumento(
+            tipo_documento=TipoDocumento.OUTRO_DESCONHECIDO.value,
+            especialidade=None,
+            nivel_prioridade=NivelPrioridade.ROTINA,
+            score_confianca_classificacao=0.0,
+        ),
+        DadosExtraidos(),
+    )
 
 
 def extrair_dados_heuristico_fallback(
@@ -152,21 +238,10 @@ def extrair_dados_heuristico_fallback(
     elif "atestado" in texto_lower:
         tipo_doc = TipoDocumento.ATESTADO.value
         especialidade = "Clínica Médica"
-    elif not texto_limpo or tem_ilegibilidade or not (
-        paciente.nome or medico.crm or "conclusão:" in texto_lower or "conclusao:" in texto_lower
-    ):
-        return (
-            ClassificacaoDocumento(
-                tipo_documento=TipoDocumento.OUTRO_DESCONHECIDO.value,
-                especialidade=None,
-                nivel_prioridade=NivelPrioridade.ROTINA,
-                score_confianca_classificacao=0.0,
-            ),
-            DadosExtraidos(),
-        )
     else:
-        tipo_doc = TipoDocumento.LAUDO_EXAME_LABORATORIAL.value
-        especialidade = "Geral"
+        # Nenhum tipo clínico reconhecido (texto vazio, ilegível ou não clínico): o modo sem IA não
+        # inventa um tipo nem dados. Sai como não identificado, com score 0.0, para a revisão humana.
+        return classificacao_nao_identificada()
 
     # Identificação de exame realizado
     exame_realizado: Optional[str] = None
@@ -283,12 +358,17 @@ def analisar_documento_com_gemini(
     utilizando o SDK oficial `google-genai` com Structured Outputs (`ResultadoExtracaoLLM`).
     Caso `LLM_API_KEY` não esteja configurada no ambiente, utiliza o fallback clínico determinístico.
     """
+    if conteudo.falha_leitura:
+        # O arquivo não abriu como PDF nem como imagem: nunca vai para o Gemini (nem para o fallback de texto).
+        classificacao, dados = classificacao_nao_identificada()
+        return classificacao, dados, ""
+
     api_key = obter_chave_llm()
     texto_atual = conteudo.texto_extraido or ""
 
     if api_key:
         try:
-            cliente = genai.Client(api_key=api_key)
+            cliente = genai.Client(api_key=api_key, http_options=types.HttpOptions(timeout=TIMEOUT_CHAMADA_MS))
             partes_conteudo = []
 
             if conteudo.requer_visao_multimodal and conteudo.bytes_midia:
@@ -305,10 +385,11 @@ def analisar_documento_com_gemini(
             else:
                 partes_conteudo.append(montar_prompt_extracao_texto(texto_atual, canal_origem))
 
-            resposta = cliente.models.generate_content(
-                model=modelo,
-                contents=partes_conteudo,
-                config=types.GenerateContentConfig(
+            resposta = _gerar_conteudo_com_tentativas(
+                cliente,
+                modelo,
+                partes_conteudo,
+                types.GenerateContentConfig(
                     system_instruction=SYSTEM_PROMPT_MEDIFLOW,
                     temperature=0.1,
                     response_mime_type="application/json",
@@ -333,11 +414,11 @@ def analisar_documento_com_gemini(
                     texto_final,
                 )
         except Exception as exc:
+            # Só o modelo, o tipo da exceção e o código HTTP: a mensagem completa pode trazer dados do paciente.
             logger.warning(
-                "Falha na chamada ao modelo Gemini %s (%s: %s). Ativando fallback clínico determinístico.",
+                "Falha na chamada ao modelo Gemini %s (%s). Ativando fallback clínico determinístico.",
                 modelo,
-                type(exc).__name__,
-                exc,
+                _descrever_falha(exc),
             )
 
     classificacao, dados = extrair_dados_heuristico_fallback(

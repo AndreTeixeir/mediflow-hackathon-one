@@ -19,7 +19,9 @@
     "dados_extraidos": {
       "paciente": {
         "nome": "Mariana Alcantara de Souza",
-        "idade": 34
+        "idade": 34,
+        "cpf": null,
+        "sexo": null
       },
       "medico_solicitante": {
         "nome": "Dr. Roberto Viana",
@@ -38,8 +40,8 @@
       "notificacao_gerada": null
     },
     "armazenamento_oci": {
-      "bucket": "mediflow-documentos-clinicos",
-      "caminho_objeto": "processados/rotina/DOC-CLIN-2026-1021.json",
+      "bucket": "mediflow-rotina",
+      "caminho_objeto": "DOC-CLIN-2026-1021.json",
       "status_backup": "sucesso"
     }
   }

@@ -43,7 +43,9 @@ Conectado via SSH na instância OCI Compute, clone o repositório, configure o `
 
 ```bash
 cp .env.example .env
-# Preencha LLM_API_KEY, OCI_REGION, OCI_NAMESPACE e OCI_BUCKET_NAME no .env
+# Preencha LLM_API_KEY, OCI_REGION, OCI_NAMESPACE e OCI_BUCKET_NAME no .env.
+# Preencha também MEDIFLOW_API_KEY: a API não sobe sem ela. Gere com:
+#   python3 -c "import secrets; print(secrets.token_urlsafe(32))"
 
 chmod +x deploy/setup_oci_vm.sh
 ./deploy/setup_oci_vm.sh

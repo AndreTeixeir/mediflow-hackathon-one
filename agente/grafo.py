@@ -27,8 +27,9 @@ from contratos.modelos import (
     TriagemResposta,
 )
 from regras.regras_clinicas import (
+    NivelUrgencia,
     calcular_score_confianca,
-    detectar_urgencia_clinica,
+    classificar_nivel_urgencia,
     executar_roteamento_clinico,
 )
 
@@ -45,12 +46,36 @@ class EstadoAgenteMediFlow(TypedDict, total=False):
     dados_extraidos: DadosExtraidos
     score_confianca: float
     pendencias_consistencia: List[str]
-    is_urgente: bool
-    justificativa_urgencia: str
     caminho_decisao: Literal["emergencia", "revisao_humana", "fluxo_padrao"]
     decisao_roteamento: DecisaoRoteamento
     status_final: StatusProcessamento
     resposta_final: TriagemResposta
+
+
+# Da menor para a maior: um termo prioritário eleva a prioridade até Prioritário, mas nunca rebaixa
+# uma prioridade maior que o LLM já tenha dado.
+ORDEM_DE_PRIORIDADE = (
+    NivelPrioridade.ROTINA,
+    NivelPrioridade.PRIORITARIO,
+    NivelPrioridade.URGENTE,
+    NivelPrioridade.EMERGENCIA,
+)
+
+# Caminho do grafo para cada destino das regras; os demais destinos seguem o fluxo padrão.
+CAMINHO_POR_DESTINO = {
+    DestinoRoteamento.FILA_EMERGENCIA: "emergencia",
+    DestinoRoteamento.FILA_REVISAO_HUMANA: "revisao_humana",
+}
+
+
+def status_para_destino(destino: DestinoRoteamento) -> StatusProcessamento:
+    """Fila_Revisao_Humana implica sempre pendente_auditoria, Documento_Rejeitado implica rejeitado
+    (só a auditoria humana o produz) e qualquer outro destino, processado."""
+    if destino == DestinoRoteamento.FILA_REVISAO_HUMANA:
+        return StatusProcessamento.PENDENTE_AUDITORIA
+    if destino == DestinoRoteamento.DOCUMENTO_REJEITADO:
+        return StatusProcessamento.REJEITADO
+    return StatusProcessamento.PROCESSADO
 
 
 # ============================================================================
@@ -92,37 +117,63 @@ def no_classificar_e_extrair(estado: EstadoAgenteMediFlow) -> EstadoAgenteMediFl
 
 def no_avaliar_consistencia_e_urgencia(estado: EstadoAgenteMediFlow) -> EstadoAgenteMediFlow:
     """
-    Nó 3: Avalia consistência clínica, calcula o Score de Confiança consolidado
-    e verifica indicadores de urgência médica crítica.
+    Nó 3: Avalia consistência clínica, calcula o Score de Confiança consolidado e pede às regras
+    a decisão de roteamento (urgência crítica, revisão humana ou fluxo padrão).
+
+    A classificação que chega aqui é a do LLM, com o score original. A penalidade de consistência
+    é aplicada UMA vez: o score consolidado e a decisão partem da mesma classificação. Os nós de
+    roteamento seguintes não recalculam nada, só aplicam o que esta decisão já definiu.
     """
+    conteudo = estado.get("conteudo_ingerido")
+    if conteudo is not None and conteudo.falha_leitura:
+        # O arquivo não abriu: não há o que avaliar. Revisão humana, com o motivo na justificativa.
+        decisao = DecisaoRoteamento(
+            destino_principal=DestinoRoteamento.FILA_REVISAO_HUMANA,
+            requer_auditoria_humana=True,
+            justificativa_roteamento=f"{conteudo.falha_leitura} O documento não foi analisado e segue para a revisão humana.",
+            notificacao_gerada=None,
+        )
+        return {
+            "score_confianca": 0.0,
+            "pendencias_consistencia": [conteudo.falha_leitura],
+            "decisao_roteamento": decisao,
+            "caminho_decisao": "revisao_humana",
+        }
+
+    entrada = estado["entrada"]
     classificacao = estado["classificacao"]
     dados = estado["dados_extraidos"]
     texto = estado.get("texto_processado", "")
+    canal = entrada.canal_origem or "Pronto_Socorro"
     limiar = estado.get("limiar_auditoria_humana", 0.75)
 
-    is_urgente, justificativa_urg = detectar_urgencia_clinica(texto, dados)
     score_calculado, pendencias = calcular_score_confianca(classificacao, dados, texto)
+    decisao = executar_roteamento_clinico(
+        classificacao=classificacao,
+        dados=dados,
+        texto_original=texto,
+        canal_origem=canal,
+        limiar_auditoria_humana=limiar,
+    )
 
-    # Se houver penalidades de consistência, reflete o score consolidado na classificação
-    if pendencias:
-        classificacao = classificacao.model_copy(
-            update={"score_confianca_classificacao": score_calculado}
-        )
-
-    if is_urgente:
-        caminho: Literal["emergencia", "revisao_humana", "fluxo_padrao"] = "emergencia"
-    elif score_calculado < limiar or len(pendencias) >= 2:
-        caminho = "revisao_humana"
-    else:
-        caminho = "fluxo_padrao"
+    # O score da resposta é o consolidado, o mesmo que a justificativa do roteamento cita. O nível
+    # de prioridade vem da função própria das regras, nunca da leitura do texto da justificativa.
+    nivel_prioridade = classificacao.nivel_prioridade
+    if (
+        classificar_nivel_urgencia(texto, dados).nivel == NivelUrgencia.PRIORITARIO
+        and ORDEM_DE_PRIORIDADE.index(nivel_prioridade) < ORDEM_DE_PRIORIDADE.index(NivelPrioridade.PRIORITARIO)
+    ):
+        nivel_prioridade = NivelPrioridade.PRIORITARIO
+    classificacao = classificacao.model_copy(
+        update={"score_confianca_classificacao": score_calculado, "nivel_prioridade": nivel_prioridade}
+    )
 
     return {
         "classificacao": classificacao,
         "score_confianca": score_calculado,
         "pendencias_consistencia": pendencias,
-        "is_urgente": is_urgente,
-        "justificativa_urgencia": justificativa_urg,
-        "caminho_decisao": caminho,
+        "decisao_roteamento": decisao,
+        "caminho_decisao": CAMINHO_POR_DESTINO.get(decisao.destino_principal, "fluxo_padrao"),
     }
 
 
@@ -144,27 +195,14 @@ def decidir_caminho_triagem(
 def no_rotear_emergencia(estado: EstadoAgenteMediFlow) -> EstadoAgenteMediFlow:
     """
     Nó 4A (Ramo Condicional de Urgência Crítica):
-    Encaminha para Fila de Emergência Médica e gera notificação imediata para o plantão.
+    Encaminha para Fila de Emergência Médica (a notificação imediata ao plantão já vem na decisão).
     """
-    entrada = estado["entrada"]
     classificacao = estado["classificacao"].model_copy(
         update={"nivel_prioridade": NivelPrioridade.URGENTE}
     )
-    dados = estado["dados_extraidos"]
-    texto = estado.get("texto_processado", "")
-    canal = entrada.canal_origem or "Pronto_Socorro"
-
-    decisao = executar_roteamento_clinico(
-        classificacao=classificacao,
-        dados=dados,
-        texto_original=texto,
-        canal_origem=canal,
-        limiar_auditoria_humana=estado.get("limiar_auditoria_humana", 0.75),
-    )
     return {
         "classificacao": classificacao,
-        "decisao_roteamento": decisao,
-        "status_final": StatusProcessamento.PROCESSADO,
+        "status_final": status_para_destino(estado["decisao_roteamento"].destino_principal),
     }
 
 
@@ -174,35 +212,7 @@ def no_rotear_revisao_humana(estado: EstadoAgenteMediFlow) -> EstadoAgenteMediFl
     Retém documentos com baixa confiança, dados ausentes ou rasuras para a
     Fila de Revisão Humana (`status = pendente_auditoria`).
     """
-    entrada = estado["entrada"]
-    classificacao = estado["classificacao"]
-    dados = estado["dados_extraidos"]
-    texto = estado.get("texto_processado", "")
-    canal = entrada.canal_origem or "Pronto_Socorro"
-
-    decisao = executar_roteamento_clinico(
-        classificacao=classificacao,
-        dados=dados,
-        texto_original=texto,
-        canal_origem=canal,
-        limiar_auditoria_humana=estado.get("limiar_auditoria_humana", 0.75),
-    )
-    # Garante que mesmo se o limiar customizado for acionado, o destino seja Revisão Humana
-    if not decisao.requer_auditoria_humana:
-        pendencias = estado.get("pendencias_consistencia", [])
-        score = estado.get("score_confianca", classificacao.score_confianca_classificacao)
-        detalhe = "; ".join(pendencias) if pendencias else "Limiar de segurança exigido"
-        decisao = DecisaoRoteamento(
-            destino_principal=DestinoRoteamento.FILA_REVISAO_HUMANA,
-            requer_auditoria_humana=True,
-            justificativa_roteamento=f"Score de confiança baixo ({score:.2f}). Inconsistências: {detalhe}.",
-            notificacao_gerada=None,
-        )
-
-    return {
-        "decisao_roteamento": decisao,
-        "status_final": StatusProcessamento.PENDENTE_AUDITORIA,
-    }
+    return {"status_final": status_para_destino(estado["decisao_roteamento"].destino_principal)}
 
 
 def no_rotear_fluxo_padrao(estado: EstadoAgenteMediFlow) -> EstadoAgenteMediFlow:
@@ -211,23 +221,7 @@ def no_rotear_fluxo_padrao(estado: EstadoAgenteMediFlow) -> EstadoAgenteMediFlow
     Encaminha automaticamente para Farmácia Hospitalar, Auditoria de Autorizações
     ou Prontuário Eletrônico do Paciente.
     """
-    entrada = estado["entrada"]
-    classificacao = estado["classificacao"]
-    dados = estado["dados_extraidos"]
-    texto = estado.get("texto_processado", "")
-    canal = entrada.canal_origem or "Pronto_Socorro"
-
-    decisao = executar_roteamento_clinico(
-        classificacao=classificacao,
-        dados=dados,
-        texto_original=texto,
-        canal_origem=canal,
-        limiar_auditoria_humana=estado.get("limiar_auditoria_humana", 0.75),
-    )
-    return {
-        "decisao_roteamento": decisao,
-        "status_final": StatusProcessamento.PROCESSADO,
-    }
+    return {"status_final": status_para_destino(estado["decisao_roteamento"].destino_principal)}
 
 
 def no_consolidar_resposta(estado: EstadoAgenteMediFlow) -> EstadoAgenteMediFlow:
@@ -311,9 +305,9 @@ def analisar_documento(
     entrada: DocumentoEntrada,
 ) -> Tuple[ClassificacaoDocumento, DadosExtraidos]:
     """
-    Interface compatível com a assinatura de `api/agente_simulado.py`:
-    Recebe `DocumentoEntrada`, executa ingestão multimodal + extração e devolve
-    `(ClassificacaoDocumento, DadosExtraidos)`.
+    Versão enxuta do pipeline, sem as regras de roteamento: recebe `DocumentoEntrada`, executa
+    ingestão multimodal + extração e devolve `(ClassificacaoDocumento, DadosExtraidos)`.
+    A API não a usa: ela chama `executar_triagem_mediflow`, que roda o grafo inteiro.
     """
     conteudo = ingerir_documento_clinico(entrada)
     classificacao, dados, _ = analisar_documento_com_gemini(

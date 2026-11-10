@@ -10,7 +10,7 @@ FalhaArmazenamento) sobem para a camada HTTP, que as converte em 409 e 503.
 
 import logging
 
-from agente import analisar_documento, executar_triagem_mediflow
+from agente import executar_triagem_mediflow
 from armazenamento.repositorio import (
     NomesBuckets,
     ObjetoJaExiste,
@@ -21,55 +21,34 @@ from contratos.modelos import (
     ArmazenamentoOCI,
     DestinoRoteamento,
     DocumentoEntrada,
-    StatusProcessamento,
     TriagemResposta,
 )
-from regras.regras_clinicas import executar_roteamento_clinico
 
 logger = logging.getLogger("mediflow.api.triagem")
 
-_analisar_documento_padrao = analisar_documento
-_roteamento_padrao = executar_roteamento_clinico
 
-
-def _bucket_destino(destino: DestinoRoteamento, buckets: NomesBuckets) -> str:
+def bucket_do_destino(destino: DestinoRoteamento, buckets: NomesBuckets) -> str:
     por_destino = {
         DestinoRoteamento.FILA_EMERGENCIA: buckets.urgentes,
         DestinoRoteamento.FILA_REVISAO_HUMANA: buckets.auditoria_humana,
         DestinoRoteamento.FARMACIA_HOSPITALAR: buckets.rotina,
         DestinoRoteamento.AUDITORIA_AUTORIZACOES: buckets.rotina,
         DestinoRoteamento.PRONTUARIO_ELETRONICO: buckets.rotina,
+        DestinoRoteamento.DOCUMENTO_REJEITADO: buckets.rejeitados,
     }
     return por_destino[destino]
 
 
 def _montar_resposta(entrada: DocumentoEntrada, buckets: NomesBuckets, nome_objeto: str) -> TriagemResposta:
-    # No fluxo padrão, executa o Grafo de Decisão completo do LangGraph (executar_triagem_mediflow).
-    # Caso testes unitários substituam analisar_documento ou executar_roteamento_clinico via
-    # monkeypatch para simular falhas internas, respeita o substituto injetado.
-    if (
-        analisar_documento is not _analisar_documento_padrao
-        or executar_roteamento_clinico is not _roteamento_padrao
-    ):
-        classificacao, dados = analisar_documento(entrada)
-        decisao = executar_roteamento_clinico(
-            classificacao,
-            dados,
-            entrada.documento_texto or "",
-            entrada.canal_origem or "Pronto_Socorro",
-        )
-        if decisao.destino_principal == DestinoRoteamento.FILA_REVISAO_HUMANA:
-            status = StatusProcessamento.PENDENTE_AUDITORIA
-        else:
-            status = StatusProcessamento.PROCESSADO
-    else:
-        resposta_grafo = executar_triagem_mediflow(entrada)
-        classificacao = resposta_grafo.classificacao
-        dados = resposta_grafo.dados_extraidos
-        decisao = resposta_grafo.decisao_roteamento
-        status = resposta_grafo.status
+    # Sempre executa o Grafo de Decisão completo do LangGraph (executar_triagem_mediflow): ele
+    # classifica, extrai, aplica as regras clínicas e devolve a decisão e o status.
+    resposta_grafo = executar_triagem_mediflow(entrada)
+    classificacao = resposta_grafo.classificacao
+    dados = resposta_grafo.dados_extraidos
+    decisao = resposta_grafo.decisao_roteamento
+    status = resposta_grafo.status
 
-    bucket_destino = _bucket_destino(decisao.destino_principal, buckets)
+    bucket_destino = bucket_do_destino(decisao.destino_principal, buckets)
 
     # status_backup="sucesso" só vale porque processar_triagem grava a resposta logo em
     # seguida e deixa a exceção subir se falhar: a resposta nunca sai afirmando um backup
