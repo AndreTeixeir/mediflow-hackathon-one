@@ -8,12 +8,16 @@ temporária (app.dependency_overrides). O .env de quem roda não influencia o re
 Execução (a partir da raiz): python -m pytest tests/test_api.py -v
 """
 
+import base64
+import io
 import json
 import logging
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from PIL import Image
+from pypdf import PdfWriter
 
 import api.triagem as modulo_triagem
 from api.main import app, obter_repositorio
@@ -74,6 +78,26 @@ def carregar_cenario(pasta):
 
 def lido(tmp_path, bucket, documento_id):
     return json.loads((tmp_path / bucket / f"{documento_id}.json").read_text(encoding="utf-8"))
+
+
+def em_base64(conteudo: bytes) -> str:
+    return base64.b64encode(conteudo).decode("ascii")
+
+
+def imagem_valida(formato="PNG") -> bytes:
+    buffer = io.BytesIO()
+    Image.new("RGB", (32, 32), color=(255, 255, 255)).save(buffer, format=formato)
+    return buffer.getvalue()
+
+
+def pdf_valido(senha=None) -> bytes:
+    escritor = PdfWriter()
+    escritor.add_blank_page(width=200, height=200)
+    if senha:
+        escritor.encrypt(senha)
+    buffer = io.BytesIO()
+    escritor.write(buffer)
+    return buffer.getvalue()
 
 
 # ============================================================================
@@ -172,7 +196,8 @@ def test_documento_desconhecido_vai_para_revisao_humana(cliente, tmp_path):
 
 def test_documento_so_com_base64_vai_para_revisao_humana(cliente):
     resposta = cliente.post(
-        "/api/v1/triagem", json={"documento_id": "DOC-BASE64", "tipo_arquivo": "PNG", "documento_base64": "iVBORw0KGgo="}
+        "/api/v1/triagem",
+        json={"documento_id": "DOC-BASE64", "tipo_arquivo": "PNG", "documento_base64": em_base64(imagem_valida())},
     )
 
     assert resposta.status_code == 200, resposta.text
@@ -244,6 +269,147 @@ def test_sem_texto_e_sem_base64_da_422_sem_gravar_nada(cliente, tmp_path, corpo)
 
 def test_corpo_sem_documento_id_da_422(cliente):
     assert cliente.post("/api/v1/triagem", json={"documento_texto": "texto"}).status_code == 422
+
+
+# ============================================================================
+# Validação do arquivo em Base64: entrada inválida é 422 e nada é gravado
+# ============================================================================
+
+def enviar_arquivo(cliente, tipo_arquivo, conteudo_base64, documento_id="DOC-ARQUIVO", **extras):
+    corpo = {"documento_id": documento_id, "tipo_arquivo": tipo_arquivo, "documento_base64": conteudo_base64, **extras}
+    return cliente.post("/api/v1/triagem", json=corpo)
+
+
+@pytest.mark.parametrize(
+    "tipo_arquivo, conteudo",
+    [
+        ("PNG", imagem_valida("PNG")),
+        ("JPG", imagem_valida("JPEG")),
+        ("JPEG", imagem_valida("JPEG")),
+        ("WEBP", imagem_valida("WEBP")),
+        ("PDF", pdf_valido()),
+        ("TXT", "texto fictício em arquivo".encode("utf-8")),
+    ],
+)
+def test_arquivo_valido_e_aceito(cliente, tipo_arquivo, conteudo):
+    resposta = enviar_arquivo(cliente, tipo_arquivo, em_base64(conteudo))
+
+    assert resposta.status_code == 200, resposta.text
+
+
+def test_tipo_arquivo_com_ponto_e_minusculas_e_aceito(cliente):
+    assert enviar_arquivo(cliente, ".png", em_base64(imagem_valida())).status_code == 200
+
+
+def test_prefixo_data_uri_e_aceito(cliente):
+    resposta = enviar_arquivo(cliente, "PNG", "data:image/png;base64," + em_base64(imagem_valida()))
+
+    assert resposta.status_code == 200, resposta.text
+
+
+def test_base64_com_quebras_de_linha_e_aceito(cliente):
+    codificado = em_base64(imagem_valida())
+    quebrado = "\n".join(codificado[i : i + 76] for i in range(0, len(codificado), 76))
+
+    assert enviar_arquivo(cliente, "PNG", quebrado).status_code == 200
+
+
+@pytest.mark.parametrize(
+    "conteudo_base64",
+    [
+        em_base64(imagem_valida())[:-3] + "!!!",  # corrompido no fim
+        em_base64(imagem_valida())[:-1],  # truncado: padding incorreto
+        "@@@ isto não é Base64 @@@",
+        "====",
+        "AAAA!",
+    ],
+)
+def test_base64_corrompido_da_422_sem_gravar_nada(cliente, tmp_path, conteudo_base64):
+    resposta = enviar_arquivo(cliente, "PNG", conteudo_base64)
+
+    assert resposta.status_code == 422
+    assert resposta.json() == {"detail": "documento_base64 não é um Base64 válido."}
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_png_que_nao_e_imagem_da_422_sem_gravar_nada(cliente, tmp_path):
+    resposta = enviar_arquivo(cliente, "PNG", em_base64(b"isto nao e uma imagem"))
+
+    assert resposta.status_code == 422
+    assert resposta.json() == {"detail": "documento_base64 não é uma imagem válida."}
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_pdf_que_nao_e_pdf_da_422_sem_gravar_nada(cliente, tmp_path):
+    resposta = enviar_arquivo(cliente, "PDF", em_base64(b"isto nao e um pdf"))
+
+    assert resposta.status_code == 422
+    assert resposta.json() == {"detail": "documento_base64 não é um PDF válido."}
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_pdf_truncado_da_422(cliente, tmp_path):
+    resposta = enviar_arquivo(cliente, "PDF", em_base64(pdf_valido()[:40]))
+
+    assert resposta.status_code == 422
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_pdf_protegido_por_senha_da_422_com_mensagem_propria(cliente, tmp_path):
+    resposta = enviar_arquivo(cliente, "PDF", em_base64(pdf_valido(senha="senha-de-teste")))
+
+    assert resposta.status_code == 422
+    assert "protegido por senha" in resposta.json()["detail"]
+    assert list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.parametrize("tipo_arquivo, conteudo", [("PNG", pdf_valido()), ("PDF", imagem_valida())])
+def test_conteudo_de_outro_formato_da_422(cliente, tmp_path, tipo_arquivo, conteudo):
+    resposta = enviar_arquivo(cliente, tipo_arquivo, em_base64(conteudo))
+
+    assert resposta.status_code == 422
+    assert list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.parametrize("tipo_arquivo", ["IMAGEM", "DOCX", "JSON", "EXE"])
+def test_tipo_arquivo_fora_da_lista_da_422_sem_gravar_nada(cliente, tmp_path, tipo_arquivo):
+    # O conteúdo é um PNG válido: o que está errado é só o tipo declarado.
+    resposta = enviar_arquivo(cliente, tipo_arquivo, em_base64(imagem_valida()))
+
+    assert resposta.status_code == 422
+    assert resposta.json() == {"detail": "tipo_arquivo não aceito: use PDF, PNG, JPG, JPEG, WEBP ou TXT."}
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_base64_em_branco_junto_com_texto_da_422_sem_gravar_nada(cliente, tmp_path):
+    resposta = enviar_arquivo(cliente, "PDF", "   ", documento_texto="texto fictício")
+
+    assert resposta.status_code == 422
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_texto_puro_aceita_qualquer_tipo_arquivo(cliente):
+    # O tipo só é conferido quando há arquivo: os cenários oficiais mandam PDF e JPG com o texto já lido.
+    resposta = cliente.post(
+        "/api/v1/triagem",
+        json={"documento_id": "DOC-TEXTO-IMAGEM", "tipo_arquivo": "IMAGEM", "documento_texto": TEXTO_DESCONHECIDO},
+    )
+
+    assert resposta.status_code == 200, resposta.text
+
+
+@pytest.mark.parametrize("tipo_arquivo", ["PDF", "PNG"])
+def test_arquivo_invalido_nao_deixa_trecho_do_arquivo_no_log_nem_na_resposta(cliente, caplog, tipo_arquivo):
+    # O pypdf registra, por conta própria, os primeiros bytes de um PDF inválido
+    # ("invalid pdf header: b'ZQXWV'"). O prefixo é raro de propósito, para o teste achar só o vazamento.
+    conteudo = b"ZQXWV-conteudo-do-paciente-no-inicio-do-arquivo" + b"\x00" * 64
+
+    with caplog.at_level(logging.DEBUG):
+        resposta = enviar_arquivo(cliente, tipo_arquivo, em_base64(conteudo), documento_id="DOC-LOG")
+
+    assert resposta.status_code == 422
+    assert "ZQXWV" not in caplog.text
+    assert "ZQXWV" not in resposta.text
 
 
 # ============================================================================

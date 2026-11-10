@@ -43,9 +43,16 @@ class ConteudoDocumentoIngerido:
     metadados_leitura: str = ""
 
 
+def normalizar_formato(tipo_arquivo: Optional[str]) -> str:
+    """Formato em maiúsculas, sem espaços nem ponto inicial. Vazio vale TXT (texto puro)."""
+    return (tipo_arquivo or "").strip().upper().lstrip(".") or "TXT"
+
+
 def decodificar_base64_seguro(conteudo_b64: str) -> bytes:
     """
     Decodifica uma string Base64 removendo eventual prefixo Data URI (ex.: data:image/jpeg;base64,...).
+    É estrita: caractere fora do alfabeto Base64 levanta binascii.Error (um ValueError). Só
+    espaços e quebras de linha são ignorados.
     """
     if not conteudo_b64 or not conteudo_b64.strip():
         raise ValueError("Conteúdo Base64 vazio.")
@@ -54,7 +61,7 @@ def decodificar_base64_seguro(conteudo_b64: str) -> bytes:
     if "," in limpo and limpo.lower().startswith("data:"):
         limpo = limpo.split(",", 1)[1]
 
-    return base64.b64decode(limpo)
+    return base64.b64decode("".join(limpo.split()), validate=True)
 
 
 def extrair_texto_pdf_bytes(pdf_bytes: bytes) -> Tuple[str, int]:
@@ -96,7 +103,7 @@ def ingerir_documento_clinico(entrada: DocumentoEntrada) -> ConteudoDocumentoIng
     Ingere um DocumentoEntrada (texto direto, PDF digital, PDF digitalizado ou imagem em Base64)
     e prepara o conteúdo para o agente de IA / Visão Multimodal.
     """
-    formato = (entrada.tipo_arquivo or "TXT").strip().upper().lstrip(".")
+    formato = normalizar_formato(entrada.tipo_arquivo)
     mime_type = MIME_TYPES_POR_FORMATO.get(formato, "application/octet-stream")
     texto_inicial = (entrada.documento_texto or "").strip()
 
