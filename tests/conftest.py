@@ -30,10 +30,16 @@ def seguranca_da_api(monkeypatch):
     """A API exige a chave de acesso também nos testes: eles mandam esta chave, sem desligar a proteção.
 
     As variáveis de segurança são definidas (as vazias valem o padrão) para o .env de quem roda os testes
-    não mudar o resultado, por exemplo com MEDIFLOW_API_AUTH=desligada.
+    não mudar o resultado, por exemplo com MEDIFLOW_API_AUTH=desligada ou tetos diários diferentes. O
+    contador diário é global ao processo: zera antes de cada teste para um não gastar o teto do outro.
     """
+    from api.seguranca import CONTADOR_DIARIO
+
     monkeypatch.setenv("MEDIFLOW_API_KEY", CHAVE_DE_TESTE)
     monkeypatch.setenv("MEDIFLOW_API_AUTH", "")
+    monkeypatch.setenv("MEDIFLOW_TETO_DIARIO_DOCUMENTOS", "")
+    monkeypatch.setenv("MEDIFLOW_TETO_DIARIO_MB", "")
+    CONTADOR_DIARIO.zerar()
 
 
 @pytest.fixture

@@ -10,17 +10,23 @@ Execução (a partir da raiz): python -m pytest tests/test_seguranca.py -v
 """
 
 import asyncio
+import base64
 import json
 import logging
+import threading
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfoNotFoundError
 
 import pytest
 from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
 import api.seguranca as seguranca
+import api.triagem as modulo_triagem
 from api.main import app, obter_repositorio
-from api.seguranca import ConfiguracaoInvalida, SegurancaMiddleware, ler_configuracao
+from api.seguranca import CONTADOR_DIARIO, ConfiguracaoInvalida, ContadorDiario, SegurancaMiddleware, ler_configuracao
 from armazenamento.repositorio import RepositorioLocal
 
 PASTA_DADOS = Path(__file__).resolve().parent.parent / "dados_teste"
@@ -479,8 +485,6 @@ def test_corpo_de_exatamente_15_mib_chega_a_rota_que_o_recusa_por_ser_invalido(n
 
 
 def test_corpo_grande_e_valido_chega_inteiro_a_rota(novo_cliente, tmp_path):
-    import base64
-
     texto = ("LAUDO DE EXAME LABORATORIAL. Paciente: Maria Exemplo, 40 anos. Hemograma normal. " * 40_000).encode()
     base64_do_arquivo = base64.b64encode(texto).decode("ascii")
     assert 2 * UM_MIB < len(base64_do_arquivo) < LIMITE  # grande, e ainda dentro do limite
@@ -493,3 +497,272 @@ def test_corpo_grande_e_valido_chega_inteiro_a_rota(novo_cliente, tmp_path):
     assert resposta.status_code == 200, resposta.text
     gravado = json.loads((tmp_path / "mediflow-recebidos" / "DOC-GRANDE.json").read_text(encoding="utf-8"))
     assert gravado["documento_base64"] == base64_do_arquivo  # o corpo inteiro chegou à rota
+
+
+# ============================================================================
+# Tetos diários: documentos e MB por dia
+# ============================================================================
+
+MSG_429_DOCUMENTOS = {"detail": "Limite diário de documentos atingido. Tente novamente amanhã."}
+MSG_429_MB = {"detail": "Limite diário de MB atingido. Tente novamente amanhã."}
+
+
+@pytest.fixture
+def chamadas_do_grafo(monkeypatch):
+    """Conta quantas vezes a triagem chegou ao grafo (e, portanto, ao Gemini), sem mudar o resultado."""
+    chamadas = []
+    original = modulo_triagem.executar_triagem_mediflow
+
+    def espiao(entrada, *args, **kwargs):
+        chamadas.append(entrada.documento_id)
+        return original(entrada, *args, **kwargs)
+
+    monkeypatch.setattr(modulo_triagem, "executar_triagem_mediflow", espiao)
+    return chamadas
+
+
+def enviar_triagem(cliente, numero):
+    return cliente.post("/api/v1/triagem", json=entrada_de_triagem(f"DOC-TETO-{numero}"))
+
+
+def test_teto_de_documentos_o_terceiro_envio_da_429_sem_gravar_e_sem_chamar_o_grafo(monkeypatch, novo_cliente, tmp_path, chamadas_do_grafo):
+    monkeypatch.setenv("MEDIFLOW_TETO_DIARIO_DOCUMENTOS", "2")
+    cliente = novo_cliente()
+
+    codigos = [enviar_triagem(cliente, n).status_code for n in (1, 2)]
+    terceiro = enviar_triagem(cliente, 3)
+
+    assert codigos == [200, 200]
+    assert terceiro.status_code == 429
+    assert terceiro.json() == MSG_429_DOCUMENTOS
+    assert chamadas_do_grafo == ["DOC-TETO-1", "DOC-TETO-2"]  # o terceiro nunca chegou ao grafo
+    assert len(list(tmp_path.rglob("*.json"))) == 4  # recebido + destino, só dos dois primeiros
+    assert not (tmp_path / "mediflow-recebidos" / "DOC-TETO-3.json").exists()
+
+
+def test_teto_de_mb_corta_o_envio_que_passaria_do_volume_do_dia(monkeypatch, novo_cliente, tmp_path, chamadas_do_grafo):
+    cliente = novo_cliente()
+    tamanho = len(cliente.build_request("POST", "/api/v1/triagem", json=entrada_de_triagem("DOC-TETO-1")).content)
+    # Cabem dois corpos desse tamanho, e o terceiro passaria do teto.
+    monkeypatch.setenv("MEDIFLOW_TETO_DIARIO_MB", str((2 * tamanho + 10) / (1024 * 1024)))
+
+    codigos = [enviar_triagem(cliente, n).status_code for n in (1, 2)]
+    terceiro = enviar_triagem(cliente, 3)
+
+    assert codigos == [200, 200]
+    assert terceiro.status_code == 429
+    assert terceiro.json() == MSG_429_MB
+    assert chamadas_do_grafo == ["DOC-TETO-1", "DOC-TETO-2"]
+    assert not (tmp_path / "mediflow-recebidos" / "DOC-TETO-3.json").exists()
+
+
+def test_o_teto_nunca_e_ultrapassado_um_corpo_maior_que_o_que_resta_e_recusado_e_um_menor_ainda_cabe(monkeypatch, novo_cliente):
+    cliente = novo_cliente()
+    grande = entrada_de_triagem("DOC-GRANDE")
+    pequeno = {"documento_id": "DOC-PEQUENO", "documento_texto": "Aviso interno curto.", "canal_origem": "Ambulatorio"}
+    tamanho_grande = len(cliente.build_request("POST", "/api/v1/triagem", json=grande).content)
+    tamanho_pequeno = len(cliente.build_request("POST", "/api/v1/triagem", json=pequeno).content)
+    # Resta espaço para o pequeno depois do grande, mas não para dois grandes.
+    monkeypatch.setenv("MEDIFLOW_TETO_DIARIO_MB", str((tamanho_grande + tamanho_pequeno + 5) / (1024 * 1024)))
+
+    assert cliente.post("/api/v1/triagem", json=grande).status_code == 200
+    assert cliente.post("/api/v1/triagem", json=dict(grande, documento_id="DOC-GRANDE-2")).status_code == 429
+    assert cliente.post("/api/v1/triagem", json=pequeno).status_code == 200  # o 429 não gastou nada do teto
+
+
+def test_so_a_triagem_conta_para_os_tetos(monkeypatch, novo_cliente, sem_chave):
+    monkeypatch.setenv("MEDIFLOW_TETO_DIARIO_DOCUMENTOS", "1")
+    cliente = novo_cliente()
+
+    for _ in range(3):
+        assert cliente.get("/api/v1/documentos").status_code == 200
+        assert cliente.get("/api/v1/auditoria/pendentes").status_code == 200
+        assert sem_chave.get("/api/v1/saude").status_code == 200
+        assert cliente.post("/api/v1/auditoria/DOC-NAO-EXISTE/decisao", json={"destino": "rotina", "revisor": "Ana", "justificativa": "Conferido."}).status_code == 404
+
+    assert enviar_triagem(cliente, 1).status_code == 200
+    assert enviar_triagem(cliente, 2).status_code == 429
+
+
+def test_requisicao_recusada_pela_chave_ou_pelo_tamanho_nao_gasta_o_teto(monkeypatch, novo_cliente, sem_chave):
+    monkeypatch.setenv("MEDIFLOW_TETO_DIARIO_DOCUMENTOS", "1")
+    cliente = novo_cliente()
+
+    assert sem_chave.post("/api/v1/triagem", json=entrada_de_triagem("DOC-SEM-CHAVE")).status_code == 401
+    assert sem_chave.post("/api/v1/triagem", json=entrada_de_triagem("DOC-CHAVE-ERRADA"), headers={"X-API-Key": "errada"}).status_code == 401
+    assert cliente.post("/api/v1/triagem", content=b"x" * (16 * UM_MIB), headers={"content-type": "application/json"}).status_code == 413
+
+    assert enviar_triagem(cliente, 1).status_code == 200  # o teto de 1 ainda estava inteiro
+
+
+def test_requisicao_invalida_que_passou_pela_chave_e_pelo_tamanho_conta(monkeypatch, novo_cliente):
+    monkeypatch.setenv("MEDIFLOW_TETO_DIARIO_DOCUMENTOS", "1")
+    cliente = novo_cliente()
+
+    invalida = cliente.post("/api/v1/triagem", json={"documento_id": "DOC-INVALIDO"})  # sem texto nem Base64
+
+    assert invalida.status_code == 422
+    assert enviar_triagem(cliente, 1).status_code == 429
+
+
+def test_sem_a_chave_o_401_vem_antes_do_429(monkeypatch, novo_cliente, sem_chave):
+    monkeypatch.setenv("MEDIFLOW_TETO_DIARIO_DOCUMENTOS", "1")
+    assert enviar_triagem(novo_cliente(), 1).status_code == 200
+
+    assert sem_chave.post("/api/v1/triagem", json=entrada_de_triagem("DOC-TETO-2")).status_code == 401
+
+
+def test_com_a_autenticacao_desligada_os_tetos_continuam_valendo(monkeypatch, novo_cliente):
+    monkeypatch.setenv("MEDIFLOW_API_AUTH", "desligada")
+    monkeypatch.setenv("MEDIFLOW_TETO_DIARIO_DOCUMENTOS", "1")
+    cliente = TestClient(app)
+
+    assert enviar_triagem(cliente, 1).status_code == 200
+    assert enviar_triagem(cliente, 2).status_code == 429
+
+
+# --- A virada do dia, com um relógio injetável (sem sleep) -------------------------------------
+
+def relogio_em(momento):
+    """Um relógio que devolve `momento` e que o teste pode mudar."""
+    estado = {"agora": momento}
+    return estado, lambda: estado["agora"]
+
+
+def utc(*partes):
+    return datetime(*partes, tzinfo=timezone.utc)
+
+
+def test_a_virada_do_dia_zera_o_contador_a_meia_noite_de_sao_paulo():
+    # Em novembro São Paulo está em UTC-3: meia-noite lá é 03:00 em UTC.
+    estado, relogio = relogio_em(utc(2026, 11, 10, 15, 0))
+    contador = ContadorDiario(relogio)
+
+    assert contador.tentar_registrar(100, 2, 10_000) is None
+    assert contador.tentar_registrar(100, 2, 10_000) is None
+    assert contador.tentar_registrar(100, 2, 10_000) == "documentos"
+
+    estado["agora"] = utc(2026, 11, 11, 2, 59, 59)  # 23:59:59 em São Paulo: ainda é o mesmo dia
+    assert contador.tentar_registrar(100, 2, 10_000) == "documentos"
+
+    estado["agora"] = utc(2026, 11, 11, 3, 0, 0)  # 00:00:00 em São Paulo: dia novo, contador zerado
+    assert contador.tentar_registrar(100, 2, 10_000) is None
+    assert contador.tentar_registrar(100, 2, 10_000) is None
+    assert contador.tentar_registrar(100, 2, 10_000) == "documentos"
+
+
+def test_a_virada_do_dia_zera_tambem_o_volume_em_mb():
+    estado, relogio = relogio_em(utc(2026, 11, 10, 15, 0))
+    contador = ContadorDiario(relogio)
+
+    assert contador.tentar_registrar(900, 100, 1000) is None
+    assert contador.tentar_registrar(200, 100, 1000) == "mb"
+
+    estado["agora"] = utc(2026, 11, 11, 3, 0)
+    assert contador.tentar_registrar(900, 100, 1000) is None
+
+
+def test_o_dia_e_o_de_sao_paulo_e_nao_o_de_utc():
+    # 01:00 UTC do dia 11 ainda é noite do dia 10 em São Paulo: o contador de UTC já teria virado.
+    estado, relogio = relogio_em(utc(2026, 11, 10, 23, 0))
+    contador = ContadorDiario(relogio)
+    assert contador.tentar_registrar(1, 1, 100) is None
+
+    estado["agora"] = utc(2026, 11, 11, 1, 0)
+
+    assert contador.tentar_registrar(1, 1, 100) == "documentos"
+
+
+def test_a_virada_do_dia_libera_a_triagem_na_api(monkeypatch, novo_cliente):
+    monkeypatch.setenv("MEDIFLOW_TETO_DIARIO_DOCUMENTOS", "1")
+    estado, relogio = relogio_em(utc(2026, 11, 10, 15, 0))
+    monkeypatch.setattr(CONTADOR_DIARIO, "_relogio", relogio)
+    cliente = novo_cliente()
+
+    assert enviar_triagem(cliente, 1).status_code == 200
+    assert enviar_triagem(cliente, 2).status_code == 429
+
+    estado["agora"] = utc(2026, 11, 11, 3, 0)
+
+    assert enviar_triagem(cliente, 3).status_code == 200
+
+
+def test_o_contador_nasce_vazio_como_depois_de_reiniciar_a_api():
+    assert ContadorDiario().tentar_registrar(1, 1, 100) is None
+
+
+def test_sem_a_base_de_fusos_o_dia_vira_em_utc_menos_3_e_a_api_avisa(monkeypatch, caplog):
+    def sem_tzdata(nome):
+        raise ZoneInfoNotFoundError(nome)
+
+    monkeypatch.setattr(seguranca, "ZoneInfo", sem_tzdata)
+    estado, relogio = relogio_em(utc(2026, 11, 11, 2, 59, 59))
+    with caplog.at_level(logging.WARNING, logger="mediflow.api.seguranca"):
+        contador = ContadorDiario(relogio)
+
+    assert "UTC-3 fixo" in caplog.text
+    assert contador.tentar_registrar(1, 1, 100) is None
+    assert contador.tentar_registrar(1, 1, 100) == "documentos"
+    estado["agora"] = utc(2026, 11, 11, 3, 0)
+    assert contador.tentar_registrar(1, 1, 100) is None
+
+
+def test_o_contador_nunca_passa_do_teto_com_varias_threads_ao_mesmo_tempo():
+    contador = ContadorDiario()
+    largada = threading.Barrier(64)
+
+    def tentar(_):
+        largada.wait()
+        return contador.tentar_registrar(10, 10, 10_000)
+
+    with ThreadPoolExecutor(max_workers=64) as pool:
+        resultados = list(pool.map(tentar, range(64)))
+
+    assert resultados.count(None) == 10  # exatamente o teto
+    assert resultados.count("documentos") == 54
+
+
+# --- Configuração dos tetos ---------------------------------------------------------------------
+
+def test_os_padroes_dos_tetos_sao_100_documentos_e_300_mb():
+    configuracao = ler_configuracao()
+
+    assert configuracao.teto_diario_de_documentos == 100
+    assert configuracao.teto_diario_de_bytes == 300 * 1024 * 1024
+
+
+@pytest.mark.parametrize("documentos, mb, esperado_docs, esperado_bytes", [
+    ("5", "", 5, 300 * 1024 * 1024),
+    ("  7  ", "0.5", 7, 524288),
+    ("", "1", 100, 1024 * 1024),
+    ("1", "0.001", 1, 1048),
+])
+def test_tetos_validos_do_ambiente(monkeypatch, documentos, mb, esperado_docs, esperado_bytes):
+    monkeypatch.setenv("MEDIFLOW_TETO_DIARIO_DOCUMENTOS", documentos)
+    monkeypatch.setenv("MEDIFLOW_TETO_DIARIO_MB", mb)
+
+    configuracao = ler_configuracao()
+
+    assert (configuracao.teto_diario_de_documentos, configuracao.teto_diario_de_bytes) == (esperado_docs, esperado_bytes)
+
+
+@pytest.mark.parametrize("variavel, valor", [
+    ("MEDIFLOW_TETO_DIARIO_DOCUMENTOS", "abc"),
+    ("MEDIFLOW_TETO_DIARIO_DOCUMENTOS", "0"),
+    ("MEDIFLOW_TETO_DIARIO_DOCUMENTOS", "-3"),
+    ("MEDIFLOW_TETO_DIARIO_DOCUMENTOS", "2.5"),
+    ("MEDIFLOW_TETO_DIARIO_MB", "abc"),
+    ("MEDIFLOW_TETO_DIARIO_MB", "0"),
+    ("MEDIFLOW_TETO_DIARIO_MB", "-1"),
+    ("MEDIFLOW_TETO_DIARIO_MB", "nan"),
+    ("MEDIFLOW_TETO_DIARIO_MB", "inf"),
+])
+def test_teto_invalido_derruba_a_subida_e_na_requisicao_da_503(monkeypatch, novo_cliente, tmp_path, variavel, valor):
+    monkeypatch.setenv(variavel, valor)
+
+    with pytest.raises(ConfiguracaoInvalida, match=variavel):
+        with TestClient(app):
+            pass
+    resposta = novo_cliente().post("/api/v1/triagem", json=entrada_de_triagem())  # sem lifespan
+    assert resposta.status_code == 503
+    assert nada_gravado(tmp_path)

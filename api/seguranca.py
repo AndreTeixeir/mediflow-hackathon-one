@@ -1,5 +1,5 @@
 """
-MediFlow - Segurança da API: chave de acesso e limite de tamanho (middleware ASGI)
+MediFlow - Segurança da API: chave de acesso, limite de tamanho e tetos diários (middleware ASGI)
 Hackathon ONE G10 - Grupo 10: MediFlow
 
 Mapeamento: api/seguranca.py
@@ -12,13 +12,22 @@ nem em resposta.
 
 O corpo da requisição tem no máximo 15 MB, o mesmo `client_max_body_size 15M` do nginx: acima disso,
 413. O middleware lê o corpo com esse teto e o repassa à rota em memória.
+
+Dois tetos por dia protegem a cota do Gemini e o armazenamento: MEDIFLOW_TETO_DIARIO_DOCUMENTOS (padrão
+100) e MEDIFLOW_TETO_DIARIO_MB (padrão 300). Cada POST /api/v1/triagem que passou pela chave e pelo
+limite de tamanho soma 1 documento e o tamanho do corpo. Ao atingir um teto, 429, sem gravar nada e sem
+chamar o Gemini. A contagem fica em memória, zera à meia-noite de America/Sao_Paulo e quando a API reinicia.
 """
 
 import hmac
 import logging
+import math
 import os
+import threading
 from dataclasses import dataclass, field
-from typing import Optional
+from datetime import datetime, timedelta, timezone, tzinfo
+from typing import Callable, Optional
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
@@ -29,7 +38,13 @@ logger = logging.getLogger("mediflow.api.seguranca")
 CABECALHO_DA_CHAVE = b"x-api-key"  # o servidor entrega os nomes dos cabeçalhos em minúsculas
 TAMANHO_MINIMO_DA_CHAVE = 32
 # O mesmo limite do nginx (`client_max_body_size 15M`, em MiB).
-LIMITE_DO_CORPO_EM_BYTES = 15 * 1024 * 1024
+UM_MB = 1024 * 1024
+LIMITE_DO_CORPO_EM_BYTES = 15 * UM_MB
+TETO_DIARIO_PADRAO_DE_DOCUMENTOS = 100
+TETO_DIARIO_PADRAO_DE_MB = 300
+ROTA_DA_TRIAGEM = ("POST", "/api/v1/triagem")
+MENSAGEM_429_DOCUMENTOS = "Limite diário de documentos atingido. Tente novamente amanhã."
+MENSAGEM_429_MB = "Limite diário de MB atingido. Tente novamente amanhã."
 # A única rota que responde sem a chave: o healthcheck do Docker (deploy/Dockerfile).
 ROTA_PUBLICA = ("GET", "/api/v1/saude")
 COMANDO_PARA_GERAR_A_CHAVE = 'python -c "import secrets; print(secrets.token_urlsafe(32))"'
@@ -43,6 +58,25 @@ class ConfiguracaoInvalida(Exception):
 class Configuracao:
     chave: str = field(repr=False)  # nunca em log nem em resposta
     autenticacao_desligada: bool
+    teto_diario_de_documentos: int
+    teto_diario_de_bytes: int
+
+
+def _ler_teto(nome: str, padrao, converter):
+    """O teto de uma variável de ambiente: vazia vale o padrão; só vale um número finito maior que zero."""
+    bruto = (os.getenv(nome) or "").strip()
+    if not bruto:
+        return padrao
+    try:
+        valor = converter(bruto)
+    except ValueError:
+        valor = None
+    if valor is None or not math.isfinite(valor) or valor <= 0:
+        raise ConfiguracaoInvalida(
+            f"{nome} precisa ser um número maior que zero (recebeu '{bruto[:40]}'). "
+            f"Deixe vazia para usar o padrão ({padrao})."
+        )
+    return valor
 
 
 def ler_configuracao() -> Configuracao:
@@ -62,7 +96,63 @@ def ler_configuracao() -> Configuracao:
                 f"MEDIFLOW_API_KEY tem {len(chave)} caracteres e o mínimo é {TAMANHO_MINIMO_DA_CHAVE}. "
                 f"Gere uma chave com: {COMANDO_PARA_GERAR_A_CHAVE}"
             )
-    return Configuracao(chave=chave, autenticacao_desligada=desligada)
+    teto_de_documentos = _ler_teto("MEDIFLOW_TETO_DIARIO_DOCUMENTOS", TETO_DIARIO_PADRAO_DE_DOCUMENTOS, int)
+    teto_de_mb = _ler_teto("MEDIFLOW_TETO_DIARIO_MB", TETO_DIARIO_PADRAO_DE_MB, float)
+    return Configuracao(
+        chave=chave,
+        autenticacao_desligada=desligada,
+        teto_diario_de_documentos=teto_de_documentos,
+        teto_diario_de_bytes=int(teto_de_mb * UM_MB),
+    )
+
+
+def _fuso_de_sao_paulo() -> tzinfo:
+    try:
+        return ZoneInfo("America/Sao_Paulo")
+    except ZoneInfoNotFoundError:
+        # Sem a base de fusos do sistema, UTC-3 fixo dá o mesmo dia: o Brasil não tem horário de verão desde 2019.
+        logger.warning("Base de fusos horários ausente: os tetos diários viram o dia em UTC-3 fixo.")
+        return timezone(timedelta(hours=-3))
+
+
+class ContadorDiario:
+    """Quantos documentos e quantos bytes a triagem recebeu hoje. Em memória, protegido por lock, zerado
+    à meia-noite de America/Sao_Paulo (e quando a API reinicia, porque nasce vazio)."""
+
+    def __init__(self, relogio: Optional[Callable[[], datetime]] = None):
+        # O relógio devolve um datetime com fuso; os testes o injetam, sem sleep.
+        self._relogio = relogio or (lambda: datetime.now(timezone.utc))
+        self._fuso = _fuso_de_sao_paulo()
+        self._trava = threading.Lock()
+        self._dia = None
+        self._documentos = 0
+        self._bytes = 0
+
+    def _dia_de_hoje(self):
+        return self._relogio().astimezone(self._fuso).date()
+
+    def tentar_registrar(self, tamanho: int, teto_de_documentos: int, teto_de_bytes: int) -> Optional[str]:
+        """Conta o documento e devolve None, ou devolve o teto atingido ("documentos" ou "mb") sem contar.
+
+        O teto nunca é ultrapassado: o documento só entra se este e o volume dele ainda couberem."""
+        with self._trava:
+            hoje = self._dia_de_hoje()
+            if hoje != self._dia:
+                self._dia, self._documentos, self._bytes = hoje, 0, 0
+            if self._documentos + 1 > teto_de_documentos:
+                return "documentos"
+            if self._bytes + tamanho > teto_de_bytes:
+                return "mb"
+            self._documentos += 1
+            self._bytes += tamanho
+            return None
+
+    def zerar(self) -> None:
+        with self._trava:
+            self._dia, self._documentos, self._bytes = None, 0, 0
+
+
+CONTADOR_DIARIO = ContadorDiario()
 
 
 def _chave_confere(scope: Scope, chave_esperada: str) -> bool:
@@ -130,8 +220,9 @@ async def _recusar_corpo_grande(scope: Scope, receive: Receive, send: Send) -> N
 
 
 class SegurancaMiddleware:
-    def __init__(self, app: ASGIApp):
+    def __init__(self, app: ASGIApp, contador: Optional[ContadorDiario] = None):
         self.app = app
+        self.contador = contador or CONTADOR_DIARIO
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] == "lifespan":
@@ -177,5 +268,16 @@ class SegurancaMiddleware:
             return
         except ClienteDesconectou:
             return
+
+        # Tetos diários: só a triagem conta, depois da chave e do limite de tamanho. Acima do teto, 429 sem
+        # chegar à rota: nada é gravado e o Gemini não é chamado.
+        if (scope["method"], scope["path"]) == ROTA_DA_TRIAGEM:
+            teto_atingido = self.contador.tentar_registrar(
+                len(corpo), configuracao.teto_diario_de_documentos, configuracao.teto_diario_de_bytes
+            )
+            if teto_atingido:
+                mensagem = MENSAGEM_429_DOCUMENTOS if teto_atingido == "documentos" else MENSAGEM_429_MB
+                await JSONResponse({"detail": mensagem}, status_code=429)(scope, receive, send)
+                return
 
         await self.app(scope, _repassar_corpo(corpo, receive), send)
