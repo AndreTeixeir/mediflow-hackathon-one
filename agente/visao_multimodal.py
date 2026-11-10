@@ -187,6 +187,19 @@ def _extrair_medico_heuristico(texto: str) -> MedicoSolicitante:
     return MedicoSolicitante(nome=nome_med, crm=crm_fmt)
 
 
+def classificacao_nao_identificada() -> Tuple[ClassificacaoDocumento, DadosExtraidos]:
+    """Documento sem tipo reconhecido: score 0.0 e nenhum dado extraído (vai para a revisão humana)."""
+    return (
+        ClassificacaoDocumento(
+            tipo_documento=TipoDocumento.OUTRO_DESCONHECIDO.value,
+            especialidade=None,
+            nivel_prioridade=NivelPrioridade.ROTINA,
+            score_confianca_classificacao=0.0,
+        ),
+        DadosExtraidos(),
+    )
+
+
 def extrair_dados_heuristico_fallback(
     texto: str,
     formato_arquivo: str = "PDF",
@@ -228,15 +241,7 @@ def extrair_dados_heuristico_fallback(
     else:
         # Nenhum tipo clínico reconhecido (texto vazio, ilegível ou não clínico): o modo sem IA não
         # inventa um tipo nem dados. Sai como não identificado, com score 0.0, para a revisão humana.
-        return (
-            ClassificacaoDocumento(
-                tipo_documento=TipoDocumento.OUTRO_DESCONHECIDO.value,
-                especialidade=None,
-                nivel_prioridade=NivelPrioridade.ROTINA,
-                score_confianca_classificacao=0.0,
-            ),
-            DadosExtraidos(),
-        )
+        return classificacao_nao_identificada()
 
     # Identificação de exame realizado
     exame_realizado: Optional[str] = None
@@ -353,6 +358,11 @@ def analisar_documento_com_gemini(
     utilizando o SDK oficial `google-genai` com Structured Outputs (`ResultadoExtracaoLLM`).
     Caso `LLM_API_KEY` não esteja configurada no ambiente, utiliza o fallback clínico determinístico.
     """
+    if conteudo.falha_leitura:
+        # O arquivo não abriu como PDF nem como imagem: nunca vai para o Gemini (nem para o fallback de texto).
+        classificacao, dados = classificacao_nao_identificada()
+        return classificacao, dados, ""
+
     api_key = obter_chave_llm()
     texto_atual = conteudo.texto_extraido or ""
 

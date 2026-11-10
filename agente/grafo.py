@@ -107,6 +107,22 @@ def no_avaliar_consistencia_e_urgencia(estado: EstadoAgenteMediFlow) -> EstadoAg
     é aplicada UMA vez: o score consolidado e a decisão partem da mesma classificação. Os nós de
     roteamento seguintes não recalculam nada, só aplicam o que esta decisão já definiu.
     """
+    conteudo = estado.get("conteudo_ingerido")
+    if conteudo is not None and conteudo.falha_leitura:
+        # O arquivo não abriu: não há o que avaliar. Revisão humana, com o motivo na justificativa.
+        decisao = DecisaoRoteamento(
+            destino_principal=DestinoRoteamento.FILA_REVISAO_HUMANA,
+            requer_auditoria_humana=True,
+            justificativa_roteamento=f"{conteudo.falha_leitura} O documento não foi analisado e segue para a revisão humana.",
+            notificacao_gerada=None,
+        )
+        return {
+            "score_confianca": 0.0,
+            "pendencias_consistencia": [conteudo.falha_leitura],
+            "decisao_roteamento": decisao,
+            "caminho_decisao": "revisao_humana",
+        }
+
     entrada = estado["entrada"]
     classificacao = estado["classificacao"]
     dados = estado["dados_extraidos"]
