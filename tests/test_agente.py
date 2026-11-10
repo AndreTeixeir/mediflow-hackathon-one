@@ -17,6 +17,7 @@ from PIL import Image
 from pypdf import PdfWriter
 
 from agente import analisar_documento, executar_triagem_mediflow, ingerir_documento_clinico
+from agente.visao_multimodal import obter_chave_llm
 from contratos.modelos import (
     DestinoRoteamento,
     DocumentoEntrada,
@@ -184,6 +185,13 @@ class TestAgenteMediFlowLangGraph(unittest.TestCase):
         # Testa validação direta no conversor de schema do SDK google-genai
         schema_sdk = _transformers.t_schema(None, ResultadoExtracaoLLM)
         self.assertIsInstance(schema_sdk, types.Schema)
+
+
+def test_conftest_isola_os_testes_da_chave_do_llm():
+    """As três variáveis ficam vazias (e não removidas) para o load_dotenv() não trazer a chave do .env."""
+    for variavel in ("LLM_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY"):
+        assert os.environ[variavel] == ""
+    assert obter_chave_llm() is None
 
 
 if __name__ == "__main__":
