@@ -42,6 +42,13 @@ def seguranca_da_api(monkeypatch):
     CONTADOR_DIARIO.zerar()
 
 
+@pytest.fixture(autouse=True)
+def buckets_com_o_prefixo_padrao(monkeypatch):
+    """Os testes esperam os buckets mediflow-*: o OCI_BUCKET_PREFIXO do .env de quem roda (a equipe pode usar
+    outro) não pode mudar os nomes. Vazio vale o padrão e, vazio, o load_dotenv() não o preenche de volta."""
+    monkeypatch.setenv("OCI_BUCKET_PREFIXO", "")
+
+
 @pytest.fixture
 def chave_de_teste():
     return CHAVE_DE_TESTE
