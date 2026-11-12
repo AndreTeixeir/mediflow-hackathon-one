@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>MediFlow - Pitch Deck DemoDay No Country</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap');
+
+@page {
+  size: 16in 9in;
+  margin: 0;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: #1e293b;
+  background-color: #f8fafc;
+  -webkit-font-smoothing: antialiased;
+}
+
+.slide {
+  width: 16in;
+  height: 9in;
+  page-break-after: always;
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 0.65in 0.85in;
+  background: #f8fafc;
+}
+
+/* Dark Slides */
+.slide.dark {
+  background: radial-gradient(circle at 85% 15%, #0e3a4d 0%, #061e27 60%, #031016 100%);
+  color: #ffffff;
+}
+
+/* Header */
+.slide-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 0.25in;
+  border-bottom: 2px solid #e2e8f0;
+  padding-bottom: 0.15in;
+}
+
+.slide.dark .slide-header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.slide-category {
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: #0b4f6c;
+  margin-bottom: 0.04in;
+}
+
+.slide.dark .slide-category {
+  color: #38bdf8;
+}
+
+.slide-title {
+  font-size: 2.1rem;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -0.5px;
+}
+
+.slide.dark .slide-title {
+  color: #ffffff;
+}
+
+.pitch-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.presenter-pill {
+  background: #0b4f6c;
+  color: #ffffff;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.time-pill {
+  background: #e0f2fe;
+  color: #0369a1;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  border: 1px solid #bae6fd;
+}
+
+.slide-footer {
+  margin-top: auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.78rem;
+  color: #64748b;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 0.15in;
+}
+
+.slide.dark .slide-footer {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  color: #94a3b8;
+}
+
+/* Grids & Cards */
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.3in;
+  flex: 1;
+}
+
+.grid-3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 0.25in;
+  flex: 1;
+}
+
+.grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.22in;
+  flex: 1;
+}
+
+.card {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 0.25in 0.28in;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 14px -2px rgba(15, 23, 42, 0.05);
+  display: flex;
+  flex-direction: column;
+}
+
+.card.highlight {
+  border-left: 6px solid #0b4f6c;
+}
+
+.card.urgent {
+  border-left: 6px solid #dc2626;
+  background: #fffcfc;
+}
+
+.card.hitl {
+  border-left: 6px solid #d97706;
+  background: #fffdfa;
+}
+
+.card.routine {
+  border-left: 6px solid #059669;
+  background: #fafffc;
+}
+
+.card.dark {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #f1f5f9;
+}
+
+.card-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #0b4f6c;
+  margin-bottom: 0.12in;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.card.dark .card-title {
+  color: #38bdf8;
+}
+
+.card-body {
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: #475569;
+}
+
+.card.dark .card-body {
+  color: #cbd5e1;
+}
+
+/* Pitch Specific Boxes */
+.cue-box {
+  background: #f1f5f9;
+  border: 1px dashed #94a3b8;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 0.85rem;
+  color: #334155;
+  margin-bottom: 0.15in;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cue-box strong {
+  color: #0b4f6c;
+}
+
+.speech-box {
+  background: #f8fafc;
+  border-left: 4px solid #0b4f6c;
+  border-radius: 4px;
+  padding: 12px 16px;
+  font-style: italic;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: #334155;
+  margin-top: auto;
+}
+
+.badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.badge.urgent { background: #fee2e2; color: #b91c1c; }
+.badge.hitl { background: #fef3c7; color: #b45309; }
+.badge.routine { background: #d1fae5; color: #047857; }
+.badge.primary { background: #e0f2fe; color: #0369a1; }
+
+ul.bullet-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+ul.bullet-list li {
+  position: relative;
+  padding-left: 20px;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: #334155;
+}
+
+ul.bullet-list li::before {
+  content: "▸";
+  position: absolute;
+  left: 0;
+  color: #0b4f6c;
+  font-weight: 800;
+  font-size: 1.1rem;
+}
+
+.slide.dark ul.bullet-list li {
+  color: #e2e8f0;
+}
+
+.slide.dark ul.bullet-list li::before {
+  color: #38bdf8;
+}
+
+/* Cover specific */
+.cover-layout {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  height: 100%;
+}
+
+.cover-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(56, 189, 248, 0.15);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  color: #38bdf8;
+  padding: 7px 16px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  margin-bottom: 0.25in;
+  width: fit-content;
+}
+
+.cover-title {
+  font-size: 3.4rem;
+  font-weight: 800;
+  line-height: 1.1;
+  color: #ffffff;
+  letter-spacing: -1px;
+  margin-bottom: 0.15in;
+}
+
+.cover-title span {
+  color: #38bdf8;
+}
+
+.cover-subtitle {
+  font-size: 1.25rem;
+  font-weight: 400;
+  line-height: 1.5;
+  color: #94a3b8;
+  margin-bottom: 0.35in;
+  max-width: 11in;
+}
+
+.flow-order {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 16px 24px;
+  border-radius: 12px;
+  width: fit-content;
+  margin-bottom: 0.2in;
+}
+
+.flow-step {
+  display: flex;
+  flex-direction: column;
+}
+
+.flow-num {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #38bdf8;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.flow-name {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.flow-arrow {
+  color: #64748b;
+  font-size: 1.2rem;
+  font-weight: bold;
+}
+</style>
+</head>
+<body>
+
+<!-- SLIDE 1: CAPA DO PITCH -->
+<div class="slide dark">
+  <div class="cover-layout">
+    <div class="cover-tag">
+      HACKATHON ONE · DEMODAY NO COUNTRY · TALENT DASHBOARD
+    </div>
+    <h1 class="cover-title">MediFlow <span>🏥</span></h1>
+    <p class="cover-subtitle">
+      Pitch Oficial: Agente Autônomo para Triagem, Extração e Roteamento de Documentos Clínicos com Validação Pydantic, Grafo LangGraph e Persistência na Nuvem OCI.
+    </p>
+
+    <div class="flow-order">
+      <div class="flow-step">
+        <span class="flow-num">Bloco 1 (1 min)</span>
+        <span class="flow-name">Guilherme</span>
+      </div>
+      <div class="flow-arrow">➔</div>
+      <div class="flow-step">
+        <span class="flow-num">Bloco 2 (1.5 min)</span>
+        <span class="flow-name">Lethicia</span>
+      </div>
+      <div class="flow-arrow">➔</div>
+      <div class="flow-step">
+        <span class="flow-num">Bloco 3 (1.5 min)</span>
+        <span class="flow-name">Ingrid</span>
+      </div>
+      <div class="flow-arrow">➔</div>
+      <div class="flow-step">
+        <span class="flow-num">Bloco 4 (1.5 min)</span>
+        <span class="flow-name">André</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="slide-footer">
+    <div>Equipe: <strong>g10-Brasil27</strong> · Tempo total: <strong>5 a 7 minutos</strong></div>
+    <div>Deploy OCI Ativo: <strong>http://137.131.182.189/</strong></div>
+  </div>
+</div>
+
+<!-- SLIDE 2: DIVISÃO OFICIAL DE TAREFAS -->
+<div class="slide">
+  <div class="slide-header">
+    <div>
+      <div class="slide-category">Estrutura & Engenharia da Equipe</div>
+      <div class="slide-title">Divisão Oficial de Responsabilidades Técnicas</div>
+    </div>
+    <div class="pitch-meta">
+      <span class="time-pill">Equipe g10-Brasil27</span>
+      <span class="presenter-pill">100% Entregue</span>
+    </div>
+  </div>
+
+  <div class="grid-4">
+    <!-- Guilherme -->
+    <div class="card highlight">
+      <div style="font-size: 0.8rem; font-weight: 700; color: #0b4f6c; text-transform: uppercase;">Membro 1</div>
+      <div class="card-title" style="margin-bottom: 6px;">Guilherme Araujo</div>
+      <div style="font-size: 0.82rem; font-weight: 600; color: #0284c7; margin-bottom: 12px;">Prompts Gemini & Tela de Envio</div>
+      <ul class="bullet-list" style="font-size: 0.84rem;">
+        <li>Estruturação dos prompts de classificação e extração médica.</li>
+        <li>Tela de envio e triagem no Streamlit (Upload de PDF/Imagem/Texto).</li>
+        <li>Abertura do pitch, dor de mercado e usabilidade hospitalar.</li>
+      </ul>
+      <div style="margin-top: auto; padding-top: 10px;">
+        <span class="badge primary">Pitch Bloco 1</span>
+      </div>
+    </div>
+
+    <!-- Lethicia -->
+    <div class="card highlight">
+      <div style="font-size: 0.8rem; font-weight: 700; color: #0b4f6c; text-transform: uppercase;">Membro 2</div>
+      <div class="card-title" style="margin-bottom: 6px;">Lethicia</div>
+      <div style="font-size: 0.82rem; font-weight: 600; color: #0284c7; margin-bottom: 12px;">Contratos, Regras & HITL</div>
+      <ul class="bullet-list" style="font-size: 0.84rem;">
+        <li>Contratos de dados Pydantic estritos para entrada e saída.</li>
+        <li>Regras clínicas, validação de CRM (dígitos/UF) e Score de Confiança.</li>
+        <li>Painel de Auditoria Human-in-the-Loop e os 3 cenários de teste.</li>
+      </ul>
+      <div style="margin-top: auto; padding-top: 10px;">
+        <span class="badge hitl">Pitch Bloco 2</span>
+      </div>
+    </div>
+
+    <!-- Ingrid -->
+    <div class="card highlight">
+      <div style="font-size: 0.8rem; font-weight: 700; color: #0b4f6c; text-transform: uppercase;">Membro 3</div>
+      <div class="card-title" style="margin-bottom: 6px;">Ingrid Soares</div>
+      <div style="font-size: 0.82rem; font-weight: 600; color: #0284c7; margin-bottom: 12px;">Grafo LangGraph & Visão Multimodal</div>
+      <ul class="bullet-list" style="font-size: 0.84rem;">
+        <li>Grafo de Decisão Condicional com nós de decisão no LangGraph.</li>
+        <li>Pipeline multimodal OCR (PDF digital/escaneado e imagem Base64).</li>
+        <li>Integração Gemini com Structured Outputs, fallback e Docker hardening.</li>
+      </ul>
+      <div style="margin-top: auto; padding-top: 10px;">
+        <span class="badge urgent">Pitch Bloco 3</span>
+      </div>
+    </div>
+
+    <!-- André -->
+    <div class="card highlight">
+      <div style="font-size: 0.8rem; font-weight: 700; color: #0b4f6c; text-transform: uppercase;">Membro 4</div>
+      <div class="card-title" style="margin-bottom: 6px;">André Teixeira</div>
+      <div style="font-size: 0.82rem; font-weight: 600; color: #0284c7; margin-bottom: 12px;">API FastAPI, OCI Storage & Deploy VM</div>
+      <ul class="bullet-list" style="font-size: 0.84rem;">
+        <li>API REST FastAPI com endpoints de triagem, auditoria e histórico.</li>
+        <li>Integração com OCI Object Storage Always Free (5 buckets).</li>
+        <li>Deploy ativo em VM OCI Compute, cache em memória e segurança.</li>
+      </ul>
+      <div style="margin-top: auto; padding-top: 10px;">
+        <span class="badge routine">Pitch Bloco 4</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="slide-footer">
+    <div>MediFlow · Hackathon ONE G10 · DemoDay No Country</div>
+    <div>Slide 2 de 8</div>
+  </div>
+</div>
+
+<!-- SLIDE 3: BLOCO 1 - GUILHERME -->
+<div class="slide">
+  <div class="slide-header">
+    <div>
+      <div class="slide-category">Pitch · Bloco 1</div>
+      <div class="slide-title">Introdução, O Problema e a Interface</div>
+    </div>
+    <div class="pitch-meta">
+      <span class="time-pill">Tempo: 1 min</span>
+      <span class="presenter-pill">Apresentador: Guilherme</span>
+    </div>
+  </div>
+
+  <div class="cue-box">
+    🖥️ <strong>Cenário de Tela na Demo:</strong> Streamlit aberto na aba <em>"Envio e Triagem de Documentos"</em> em <code>http://137.131.182.189/</code>.
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">Tópicos do Discurso</div>
+      <ul class="bullet-list">
+        <li><strong>Abertura e Boas-Vindas:</strong> Apresentação do Grupo 10 e do projeto MediFlow perante a banca do DemoDay.</li>
+        <li><strong>O Gargalo Real da Saúde:</strong> Triagem manual de exames e laudos é lenta, gera custos bilionários com glosas e atrasa condutas emergenciais.</li>
+        <li><strong>Usabilidade Hospitalar:</strong> Interface Streamlit criada para simplificar a rotina médica — envio em 1 clique de textos, PDFs ou fotos de receitas.</li>
+        <li><strong>Transição:</strong> Introduz a Lethicia para apresentar a validação clínica e os contratos que garantem a segurança do paciente.</li>
+      </ul>
+    </div>
+
+    <div class="card" style="background: #f8fafc; border-left: 5px solid #0b4f6c;">
+      <div class="card-title" style="font-size: 1.05rem;">Roteiro de Fala Sugerido</div>
+      <div class="speech-box">
+        "Olá avaliadores! Nós somos o Grupo 10 e apresentamos o MediFlow, desenvolvido para resolver o gargalo da triagem lenta e manual na saúde. Erros manuais e atrasos custam caro e comprometem o atendimento em situações críticas.<br><br>
+        Desenvolvemos no Streamlit uma interface intuitiva onde o profissional pode digitar o texto clínico ou fazer upload direto de PDF digital, escaneado ou foto de receita.<br><br>
+        Por trás dessa interface, opera um rigoroso ecossistema de validação clínica, que a Lethicia vai apresentar agora."
+      </div>
+    </div>
+  </div>
+
+  <div class="slide-footer">
+    <div>MediFlow · Hackathon ONE G10 · DemoDay No Country</div>
+    <div>Slide 3 de 8</div>
+  </div>
+</div>
+
+<!-- SLIDE 4: BLOCO 2 - LETHICIA -->
+<div class="slide">
+  <div class="slide-header">
+    <div>
+      <div class="slide-category">Pitch · Bloco 2</div>
+      <div class="slide-title">Contratos de Dados, Validação Clínica & HITL</div>
+    </div>
+    <div class="pitch-meta">
+      <span class="time-pill">Tempo: 1.5 min</span>
+      <span class="presenter-pill" style="background: #d97706;">Apresentadora: Lethicia</span>
+    </div>
+  </div>
+
+  <div class="cue-box">
+    🖥️ <strong>Cenário de Tela na Demo:</strong> Streamlit na aba <em>"Fila de Auditoria Humana"</em> mostrando o <strong>Cenário 3 (Receita Rasurada/Ilegível)</strong>.
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">Tópicos do Discurso</div>
+      <ul class="bullet-list">
+        <li><strong>Rigor e Tipagem Estrita:</strong> Contratos Pydantic estruturando schemas de paciente, CRM (4 a 6 dígitos com UF válida) e CID-10.</li>
+        <li><strong>Score de Confiança Matemático:</strong> Regras determinísticas penalizam dados ausentes ou inconclusivos (ex.: CRM em branco, posologia ilegível).</li>
+        <li><strong>Human-in-the-Loop (HITL):</strong> Documento retido com score 0.00 na Fila de Revisão Humana, protegendo o paciente de erros de medicação.</li>
+        <li><strong>Decisão Auditada:</strong> O auditor visualiza o documento original, avalia a sugestão da IA e toma a decisão (Aprovar/Rejeitar) com justificativa gravada.</li>
+        <li><strong>Transição:</strong> Passa a palavra para a Ingrid explicar o Grafo LangGraph e a Visão Multimodal.</li>
+      </ul>
+    </div>
+
+    <div class="card hitl">
+      <div class="card-title" style="color: #92400e; font-size: 1.05rem;">Roteiro de Fala Sugerido</div>
+      <div class="speech-box" style="border-left-color: #d97706;">
+        "Na saúde, a segurança exige rigor absoluto. Estruturei os Contratos de Dados com Pydantic, garantindo schemas estritos de paciente, médico e CRM.<br><br>
+        Desenvolvi o motor de regras clínicas determinístico para calcular o Score de Confiança. Quando um documento tem baixa confiabilidade — como esta receita ilegível do Cenário 3 —, o MediFlow o retém na Fila de Revisão Humana (Human-in-the-Loop).<br><br>
+        O auditor clínico revisa o original, preenche os dados e decide o roteamento com total rastreabilidade. Toda essa orquestração é conduzida pelo agente implementado pela Ingrid."
+      </div>
+    </div>
+  </div>
+
+  <div class="slide-footer">
+    <div>MediFlow · Hackathon ONE G10 · DemoDay No Country</div>
+    <div>Slide 4 de 8</div>
+  </div>
+</div>
+
+<!-- SLIDE 5: BLOCO 3 - INGRID -->
+<div class="slide">
+  <div class="slide-header">
+    <div>
+      <div class="slide-category">Pitch · Bloco 3</div>
+      <div class="slide-title">Grafo LangGraph, Visão Multimodal & Urgência</div>
+    </div>
+    <div class="pitch-meta">
+      <span class="time-pill">Tempo: 1.5 min</span>
+      <span class="presenter-pill" style="background: #dc2626;">Apresentadora: Ingrid</span>
+    </div>
+  </div>
+
+  <div class="cue-box">
+    🖥️ <strong>Cenário de Tela na Demo:</strong> Streamlit demonstrando o <strong>Cenário 2 (Urgência Crítica - TEP Agudo)</strong> e o alerta ao Plantão Médico.
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">Tópicos do Discurso</div>
+      <ul class="bullet-list">
+        <li><strong>Grafo Condicional LangGraph:</strong> Estado tipado e nós sequenciais de Ingestão Multimodal, Classificação, Avaliação Clínica e Roteamento.</li>
+        <li><strong>Visão Multimodal Gemini + Fallback:</strong> Pipeline com <code>pypdf</code> e <code>Pillow</code>. Extração via Gemini 3.5 Flash Lite com Structured Outputs e fallback local determinístico para total resiliência.</li>
+        <li><strong>Detecção de Emergência Crítica:</strong> Demonstração do laudo de Tomografia com Embolia Pulmonar (TEP) gerando alerta imediato ao <code>Alerta_Plantao_Medico</code>.</li>
+        <li><strong>Hardening & Segurança:</strong> Docker multi-stage com usuário não-root, Nginx com rate limit e chave <code>X-API-Key</code>.</li>
+        <li><strong>Transição:</strong> Passa para o André apresentar a API e a nuvem OCI.</li>
+      </ul>
+    </div>
+
+    <div class="card urgent">
+      <div class="card-title" style="color: #991b1b; font-size: 1.05rem;">Roteiro de Fala Sugerido</div>
+      <div class="speech-box" style="border-left-color: #dc2626;">
+        "Para estruturar o raciocínio autônomo, desenvolvi o Grafo de Decisão Condicional com LangGraph. O documento percorre nós dedicados de Ingestão, Extração Multimodal, Avaliação de Consistência e Roteamento.<br><br>
+        Integrei a Visão Multimodal com Google Gemini, processando PDFs digitais, escaneados e fotos com Structured Outputs e fallback local determinístico.<br><br>
+        Ao processar este laudo com Tromboembolismo Pulmonar Agudo (TEP), o agente eleva a prioridade para Urgente e gera alerta imediato para o Plantão Médico. Toda a solução foi empacotada em containers Docker seguros para nuvem OCI, como o André vai demonstrar."
+      </div>
+    </div>
+  </div>
+
+  <div class="slide-footer">
+    <div>MediFlow · Hackathon ONE G10 · DemoDay No Country</div>
+    <div>Slide 5 de 8</div>
+  </div>
+</div>
+
+<!-- SLIDE 6: BLOCO 4 - ANDRÉ -->
+<div class="slide">
+  <div class="slide-header">
+    <div>
+      <div class="slide-category">Pitch · Bloco 4</div>
+      <div class="slide-title">API FastAPI, Nuvem OCI Always Free & Conclusão</div>
+    </div>
+    <div class="pitch-meta">
+      <span class="time-pill">Tempo: 1.5 min</span>
+      <span class="presenter-pill" style="background: #059669;">Apresentador: André</span>
+    </div>
+  </div>
+
+  <div class="cue-box">
+    🖥️ <strong>Cenário de Tela na Demo:</strong> Aba <em>"Histórico & Buckets OCI"</em> no Streamlit e validação em <code>http://137.131.182.189/api/v1/saude</code>.
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">Tópicos do Discurso</div>
+      <ul class="bullet-list">
+        <li><strong>API FastAPI Transacional:</strong> Endpoints de triagem e auditoria com controle de concorrência e compensação automática contra corrupção de dados.</li>
+        <li><strong>Persistência no OCI Object Storage:</strong> Segregação nativa nos 5 buckets Always Free (<code>recebidos</code>, <code>rotina</code>, <code>urgentes</code>, <code>auditoria-humana</code> e <code>rejeitados</code>).</li>
+        <li><strong>Deploy Completo em Nuvem OCI:</strong> Demonstração da aplicação rodando na VM Compute pública (<code>137.131.182.189</code>).</li>
+        <li><strong>Fechamento do Pitch:</strong> Redução do tempo de triagem de horas para segundos, rastreabilidade médica absoluta e agradecimentos.</li>
+      </ul>
+    </div>
+
+    <div class="card routine">
+      <div class="card-title" style="color: #065f46; font-size: 1.05rem;">Roteiro de Fala Sugerido</div>
+      <div class="speech-box" style="border-left-color: #059669;">
+        "Para conectar todas as camadas, desenvolvi a API REST em FastAPI, com controle transacional e compensação atômica.<br><br>
+        Em conformidade com o programa ONE, persistimos os documentos no OCI Object Storage Always Free, segregados nos buckets dedicados: mediflow-recebidos, rotina, urgentes e auditoria-humana.<br><br>
+        A aplicação está 100% no ar em produção na VM da Oracle Cloud. O MediFlow entrega usabilidade simples, IA multimodal, consistência clínica e nuvem segura, reduzindo a triagem de horas para segundos com rastreabilidade total. Muito obrigado!"
+      </div>
+    </div>
+  </div>
+
+  <div class="slide-footer">
+    <div>MediFlow · Hackathon ONE G10 · DemoDay No Country</div>
+    <div>Slide 6 de 8</div>
+  </div>
+</div>
+
+<!-- SLIDE 7: GUIA DOS 3 CENÁRIOS NA APRESENTAÇÃO -->
+<div class="slide">
+  <div class="slide-header">
+    <div>
+      <div class="slide-category">Roteiro Visual da Apresentação</div>
+      <div class="slide-title">Demonstração Prática dos 3 Cenários Oficiais</div>
+    </div>
+    <div class="pitch-meta">
+      <span class="time-pill">Ao Vivo na Gravação</span>
+      <span class="presenter-pill">710 Testes Passando</span>
+    </div>
+  </div>
+
+  <div class="grid-3">
+    <!-- Cenário 1 -->
+    <div class="card routine">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+        <span class="badge routine">Cenário 1 · Rotina</span>
+        <strong style="color: #059669; font-size: 0.85rem;">Score: 0.98</strong>
+      </div>
+      <div class="card-title" style="font-size: 1.1rem; color: #065f46;">Hemograma de Rotina</div>
+      <div class="card-body" style="font-size: 0.85rem;">
+        <strong>Apresentação:</strong> Bloco 1 ou 4.<br>
+        <strong>Entrada:</strong> PDF de laudo ambulatorial.<br>
+        <strong>Decisão do Agente:</strong> Aprovado sem pendências.<br>
+        <strong>Destino:</strong> <code>Prontuario_Eletronico</code><br>
+        <strong>Bucket OCI:</strong> <code>mediflow-rotina</code>
+      </div>
+      <div style="margin-top: auto; padding-top: 10px; font-size: 0.78rem; color: #047857; font-weight: 600;">
+        ✔ Fluxo automatizado sem intervenção humana
+      </div>
+    </div>
+
+    <!-- Cenário 2 -->
+    <div class="card urgent">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+        <span class="badge urgent">Cenário 2 · Urgência</span>
+        <strong style="color: #dc2626; font-size: 0.85rem;">Score: 0.99</strong>
+      </div>
+      <div class="card-title" style="font-size: 1.1rem; color: #991b1b;">TEP Agudo (Emergência)</div>
+      <div class="card-body" style="font-size: 0.85rem;">
+        <strong>Apresentação:</strong> Bloco 3 (Ingrid).<br>
+        <strong>Entrada:</strong> Tomografia de Tórax.<br>
+        <strong>Decisão do Agente:</strong> Urgência Máxima.<br>
+        <strong>Alerta:</strong> Notificação ao <code>Alerta_Plantao_Medico</code><br>
+        <strong>Bucket OCI:</strong> <code>mediflow-urgentes</code>
+      </div>
+      <div style="margin-top: auto; padding-top: 10px; font-size: 0.78rem; color: #b91c1c; font-weight: 600;">
+        🚨 Notificação imediata para salvar vidas
+      </div>
+    </div>
+
+    <!-- Cenário 3 -->
+    <div class="card hitl">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+        <span class="badge hitl">Cenário 3 · HITL</span>
+        <strong style="color: #d97706; font-size: 0.85rem;">Score: 0.00</strong>
+      </div>
+      <div class="card-title" style="font-size: 1.1rem; color: #92400e;">Receita Rasurada / Ilegível</div>
+      <div class="card-body" style="font-size: 0.85rem;">
+        <strong>Apresentação:</strong> Bloco 2 (Lethicia).<br>
+        <strong>Entrada:</strong> Imagem com carimbo borrado.<br>
+        <strong>Decisão do Agente:</strong> Retido para auditoria.<br>
+        <strong>Destino:</strong> <code>Fila_Revisao_Humana</code><br>
+        <strong>Bucket OCI:</strong> <code>mediflow-auditoria-humana</code>
+      </div>
+      <div style="margin-top: auto; padding-top: 10px; font-size: 0.78rem; color: #b45309; font-weight: 600;">
+        ⚠️ Segurança e compliance Human-in-the-Loop
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top: 0.2in; background: #0b4f6c; color: white; border: none; flex: 0.45;">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <strong style="font-size: 0.95rem; color: #38bdf8;">Instrução de Gravação da Equipe</strong>
+      <span class="badge primary">Dica da Demo</span>
+    </div>
+    <div style="font-size: 0.88rem; color: #f1f5f9; line-height: 1.45; margin-top: 6px;">
+      Durante a fala de cada integrante, mantenha a câmera ligada e a tela compartilhada no link oficial <code>http://137.131.182.189/</code> mostrando o cenário correspondente em tempo real.
+    </div>
+  </div>
+
+  <div class="slide-footer">
+    <div>MediFlow · Hackathon ONE G10 · DemoDay No Country</div>
+    <div>Slide 7 de 8</div>
+  </div>
+</div>
+
+<!-- SLIDE 8: CONCLUSÃO & LINKS DEMODAY -->
+<div class="slide dark">
+  <div class="slide-header">
+    <div>
+      <div class="slide-category" style="color: #38bdf8;">DemoDay No Country · Talent Dashboard</div>
+      <div class="slide-title">MediFlow: Transformando a Saúde com IA e Nuvem</div>
+    </div>
+    <div class="pitch-meta">
+      <span class="presenter-pill" style="background: #38bdf8; color: #04202c;">Pronto para Submissão</span>
+    </div>
+  </div>
+
+  <div class="grid-2" style="flex: 1;">
+    <div class="card dark">
+      <div class="card-title" style="color: #38bdf8;">Links Oficiais do Projeto</div>
+      <div style="display: flex; flex-direction: column; gap: 14px; margin-top: 15px;">
+        <div style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.15); padding: 12px 16px; border-radius: 8px;">
+          <div style="font-size: 0.78rem; color: #38bdf8; font-weight: 700; text-transform: uppercase;">Aplicação no Ar (OCI Compute)</div>
+          <div style="font-family: 'JetBrains Mono', monospace; font-size: 1.05rem; color: #ffffff; margin-top: 4px;">
+            http://137.131.182.189/
+          </div>
+        </div>
+
+        <div style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.15); padding: 12px 16px; border-radius: 8px;">
+          <div style="font-size: 0.78rem; color: #38bdf8; font-weight: 700; text-transform: uppercase;">Repositório Oficial GitHub</div>
+          <div style="font-family: 'JetBrains Mono', monospace; font-size: 1.05rem; color: #ffffff; margin-top: 4px;">
+            github.com/No-Country-simulation/g10-Brasil27
+          </div>
+        </div>
+
+        <div style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.15); padding: 12px 16px; border-radius: 8px;">
+          <div style="font-size: 0.78rem; color: #38bdf8; font-weight: 700; text-transform: uppercase;">Health Check da API</div>
+          <div style="font-family: 'JetBrains Mono', monospace; font-size: 1.05rem; color: #ffffff; margin-top: 4px;">
+            http://137.131.182.189/api/v1/saude
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card dark" style="text-align: center; justify-content: center;">
+      <div style="font-size: 2.2rem; font-weight: 800; color: #ffffff; margin-bottom: 10px;">
+        Muito Obrigado! 🏥
+      </div>
+      <div style="font-size: 1.05rem; color: #38bdf8; font-weight: 600; margin-bottom: 25px;">
+        Equipe MediFlow · Grupo 10 (g10-Brasil27)
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 0.85rem; color: #cbd5e1; text-align: left; max-width: 4.8in; margin: 0 auto;">
+        <div>• <strong>Guilherme:</strong> Interface & Prompts</div>
+        <div>• <strong>Lethicia:</strong> Contratos & Regras</div>
+        <div>• <strong>Ingrid:</strong> LangGraph & Multimodal</div>
+        <div>• <strong>André:</strong> API, OCI & Deploy</div>
+      </div>
+
+      <div style="margin-top: 30px; font-size: 0.8rem; color: #94a3b8;">
+        Programa ONE · Oracle Next Education · Alura · No Country DemoDay
+      </div>
+    </div>
+  </div>
+
+  <div class="slide-footer">
+    <div>MediFlow · Hackathon ONE G10 · DemoDay No Country</div>
+    <div>Slide 8 de 8</div>
+  </div>
+</div>
+
+</body>
+</html>

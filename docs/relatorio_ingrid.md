@@ -72,6 +72,6 @@ Implementação do motor de orquestração autônomo com **LangGraph (`StateGrap
 - [x] Resolução de todos os pontos de integração da Fase 1 atribuídos à Ingrid (`E1`, `E5`, `E6`, `E7`, `E8`).
 - [x] Code Review e Merge do **PR #3** do André (`api/` e `armazenamento/`).
 - [x] **Merge do PR #2 (`feature/agente-deploy-ingrid`) na `main` (`d67e823`):** Grafo LangGraph, Visão Multimodal, Prompts e Deploy integrados na branch principal.
-- [x] **Integração API $\leftrightarrow$ Grafo (Item E7):** `api/triagem.py` conectado ao grafo real (`executar_triagem_mediflow` / `analisar_documento` do pacote `agente`), `.env.example` documentado com Google Gemini (`gemini-2.5-flash`) e 90/90 testes automatizados passando.
+- [x] **Integração API $\leftrightarrow$ Grafo (Item E7):** `api/triagem.py` conectado ao grafo real (`executar_triagem_mediflow` / `analisar_documento` do pacote `agente`), `.env.example` documentado com Google Gemini (`gemini-3.5-flash-lite`) e 710/710 testes automatizados passando.
 - [x] **Code Review, Merge e Integração da Interface Streamlit (PR #4 — `interface/app.py`):** Integrada na `main` com suporte a `MEDIFLOW_API_URL` (local/Docker), upload multimodal (`PDF`/`PNG`/`JPG` em Base64) e conexão direta com a API e o Grafo LangGraph.
-- [ ] **Próximo Passo Final (Deploy em Nuvem OCI):** Subir a aplicação integrada na VM da OCI Always Free utilizando `deploy/setup_oci_vm.sh` e `deploy/docker-compose.yml`.
+- [x] **Deploy em Nuvem OCI Concluído:** Aplicação em produção rodando na VM Compute Always Free da Oracle Cloud em `http://137.131.182.189/` com Nginx, Docker Compose e buckets OCI segregados ativos.

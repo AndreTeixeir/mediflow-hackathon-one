@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>MediFlow - Apresentação DemoDay No Country</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap');
+
+@page {
+  size: 16in 9in;
+  margin: 0;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: #1e293b;
+  background-color: #f8fafc;
+  -webkit-font-smoothing: antialiased;
+}
+
+.slide {
+  width: 16in;
+  height: 9in;
+  page-break-after: always;
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 0.65in 0.85in;
+  background: #f8fafc;
+}
+
+/* Dark Slides */
+.slide.dark {
+  background: radial-gradient(circle at 85% 15%, #0e3a4d 0%, #061e27 60%, #031016 100%);
+  color: #ffffff;
+}
+
+/* Header */
+.slide-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 0.3in;
+  border-bottom: 2px solid #e2e8f0;
+  padding-bottom: 0.15in;
+}
+
+.slide.dark .slide-header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.slide-category {
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: #0b4f6c;
+  margin-bottom: 0.04in;
+}
+
+.slide.dark .slide-category {
+  color: #38bdf8;
+}
+
+.slide-title {
+  font-size: 2.1rem;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -0.5px;
+}
+
+.slide.dark .slide-title {
+  color: #ffffff;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Small Presenter Tag in the corner */
+.presenter-tag {
+  background: #e0f2fe;
+  color: #0369a1;
+  border: 1px solid #bae6fd;
+  padding: 5px 12px;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.presenter-tag.dark {
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+  border-color: rgba(56, 189, 248, 0.3);
+}
+
+.slide-footer {
+  margin-top: auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.78rem;
+  color: #64748b;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 0.15in;
+}
+
+.slide.dark .slide-footer {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  color: #94a3b8;
+}
+
+/* Grids & Cards */
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.3in;
+  flex: 1;
+}
+
+.grid-3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 0.25in;
+  flex: 1;
+}
+
+.grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.22in;
+  flex: 1;
+}
+
+.card {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 0.25in 0.28in;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 14px -2px rgba(15, 23, 42, 0.05);
+  display: flex;
+  flex-direction: column;
+}
+
+.card.highlight {
+  border-left: 6px solid #0b4f6c;
+}
+
+.card.urgent {
+  border-left: 6px solid #dc2626;
+  background: #fffafa;
+}
+
+.card.hitl {
+  border-left: 6px solid #d97706;
+  background: #fffdfa;
+}
+
+.card.routine {
+  border-left: 6px solid #059669;
+  background: #fafffc;
+}
+
+.card.dark {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #f1f5f9;
+}
+
+.card-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #0b4f6c;
+  margin-bottom: 0.12in;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.card.dark .card-title {
+  color: #38bdf8;
+}
+
+.card-body {
+  font-size: 0.92rem;
+  line-height: 1.55;
+  color: #475569;
+}
+
+.card.dark .card-body {
+  color: #cbd5e1;
+}
+
+.pill {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.pill.urgent { background: #fee2e2; color: #b91c1c; }
+.pill.hitl { background: #fef3c7; color: #b45309; }
+.pill.routine { background: #d1fae5; color: #047857; }
+.pill.primary { background: #e0f2fe; color: #0369a1; }
+
+.stat-num {
+  font-size: 2.6rem;
+  font-weight: 800;
+  color: #0b4f6c;
+  line-height: 1.1;
+  margin-bottom: 4px;
+}
+
+.stat-desc {
+  font-size: 0.88rem;
+  color: #64748b;
+  font-weight: 500;
+}
+
+ul.feature-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+ul.feature-list li {
+  position: relative;
+  padding-left: 22px;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: #334155;
+}
+
+ul.feature-list li::before {
+  content: "✔";
+  position: absolute;
+  left: 0;
+  color: #0b4f6c;
+  font-weight: 800;
+}
+
+.slide.dark ul.feature-list li {
+  color: #e2e8f0;
+}
+
+.slide.dark ul.feature-list li::before {
+  color: #38bdf8;
+}
+
+/* Cover specific */
+.cover-layout {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  height: 100%;
+}
+
+.cover-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(56, 189, 248, 0.15);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  color: #38bdf8;
+  padding: 7px 16px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  margin-bottom: 0.25in;
+  width: fit-content;
+}
+
+.cover-title {
+  font-size: 3.5rem;
+  font-weight: 800;
+  line-height: 1.1;
+  color: #ffffff;
+  letter-spacing: -1px;
+  margin-bottom: 0.18in;
+}
+
+.cover-title span {
+  color: #38bdf8;
+}
+
+.cover-subtitle {
+  font-size: 1.3rem;
+  font-weight: 400;
+  line-height: 1.55;
+  color: #94a3b8;
+  margin-bottom: 0.4in;
+  max-width: 11in;
+}
+
+.team-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.22in;
+}
+
+.member-box {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  padding: 14px 18px;
+}
+
+.member-name {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin-bottom: 4px;
+}
+
+.member-role {
+  font-size: 0.78rem;
+  color: #38bdf8;
+  font-weight: 600;
+  line-height: 1.3;
+}
+</style>
+</head>
+<body>
+
+<!-- SLIDE 1: CAPA -->
+<div class="slide dark">
+  <div class="cover-layout">
+    <div class="cover-tag">
+      HACKATHON ONE · DEMODAY NO COUNTRY · TALENT DASHBOARD
+    </div>
+    <h1 class="cover-title">MediFlow <span>🏥</span></h1>
+    <p class="cover-subtitle">
+      Agente Autônomo para Triagem, Extração e Roteamento de Documentos Clínicos com Orquestração Multimodal, Validação Human-in-the-Loop e Nuvem OCI Always Free.
+    </p>
+
+    <div class="team-grid">
+      <div class="member-box">
+        <div class="member-name">Guilherme Araujo</div>
+        <div class="member-role">Prompts Gemini & Tela Streamlit</div>
+      </div>
+      <div class="member-box">
+        <div class="member-name">Lethicia</div>
+        <div class="member-role">Contratos Pydantic & Regras Clínicas</div>
+      </div>
+      <div class="member-box">
+        <div class="member-name">Ingrid Soares</div>
+        <div class="member-role">Grafo LangGraph & Visão Multimodal</div>
+      </div>
+      <div class="member-box">
+        <div class="member-name">André Teixeira</div>
+        <div class="member-role">API FastAPI, OCI Storage & Deploy VM</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="slide-footer">
+    <div>Equipe: <strong>g10-Brasil27</strong> · Oracle Next Education & Alura</div>
+    <div>Ambiente em Produção: <strong>http://137.131.182.189/</strong></div>
+  </div>
+</div>
+
+<!-- SLIDE 2: A DOR DO MERCADO (PITCH HOOK) -->
+<div class="slide">
+  <div class="slide-header">
+    <div>
+      <div class="slide-category">O Problema na Saúde</div>
+      <div class="slide-title">O Gargalo da Triagem Documental Manual</div>
+    </div>
+    <div class="header-right">
+      <span class="presenter-tag">Apresentação: Guilherme Araujo</span>
+    </div>
+  </div>
+
+  <div class="grid-3">
+    <div class="card highlight">
+      <div class="card-title">🚨 Risco Crítico em Urgências</div>
+      <div class="card-body">
+        Laudos graves com quadros de emergência médica (como Tromboembolismo Pulmonar Agudo, Infarto ou AVC) ficam retidos em filas manuais, atrasando intervenções onde minutos salvam vidas.
+      </div>
+      <div style="margin-top: auto; padding-top: 15px;">
+        <span class="pill urgent">Atrasos Fatais</span>
+      </div>
+    </div>
+
+    <div class="card highlight">
+      <div class="card-title">📉 Erros de Medicação & Glosas</div>
+      <div class="card-body">
+        A digitação manual de receitas com caligrafia difícil e exames gera erros em posologias, medicamentos trocados e inconsistências de CRM/CID, gerando prejuízos bilionários em glosas hospitalares.
+      </div>
+      <div style="margin-top: auto; padding-top: 15px;">
+        <span class="pill hitl">Prejuízo Financeiro</span>
+      </div>
+    </div>
+
+    <div class="card highlight">
+      <div class="card-title">⏳ Sobrecarga Operacional</div>
+      <div class="card-body">
+        Equipes de saúde e administrativas perdem milhares de horas lendo documentos heterogêneos (PDFs digitais, digitalizados ou fotos) para transcrever dados manualmente em sistemas legados.
+      </div>
+      <div style="margin-top: auto; padding-top: 15px;">
+        <span class="pill primary">Falta de Automação</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid-3" style="margin-top: 0.25in; flex: 0.55;">
+    <div class="card" style="text-align: center; justify-content: center; background: #f1f5f9;">
+      <div class="stat-num">4h a 48h</div>
+      <div class="stat-desc">Tempo médio de triagem manual em hospitais</div>
+    </div>
+    <div class="card" style="text-align: center; justify-content: center; background: #e0f2fe;">
+      <div class="stat-num" style="color: #0369a1;">&lt; 2 seg</div>
+      <div class="stat-desc">Tempo de triagem e extração no MediFlow</div>
+    </div>
+    <div class="card" style="text-align: center; justify-content: center; background: #dcfce7;">
+      <div class="stat-num" style="color: #15803d;">100%</div>
+      <div class="stat-desc">Rastreabilidade e segregação de auditoria</div>
+    </div>
+  </div>
+
+  <div class="slide-footer">
+    <div>MediFlow · Hackathon ONE G10 · DemoDay No Country</div>
+    <div>Slide 2 de 9</div>
+  </div>
+</div>
+
+<!-- SLIDE 3: A SOLUÇÃO & INTERFACE -->
+<div class="slide">
+  <div class="slide-header">
+    <div>
+      <div class="slide-category">Visão Geral da Solução</div>
+      <div class="slide-title">MediFlow: Recepção Multimodal & Usabilidade Hospitalar</div>
+    </div>
+    <div class="header-right">
+      <span class="presenter-tag">Apresentação: Guilherme Araujo</span>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card highlight">
+      <div class="card-title">Interface Streamlit de Envio & Triagem</div>
+      <ul class="feature-list" style="margin-top: 0.1in;">
+        <li><strong>Simplicidade na Rotina Hospitalar:</strong> Interface desenvolvida em Streamlit, intuitiva e acessível para médicos, recepcionistas e enfermeiros.</li>
+        <li><strong>Upload Multimodal Unificado:</strong> Suporte direto a textos clínicos, PDFs nativos, laudos escaneados e imagens em Base64 (PNG, JPG, WEBP).</li>
+        <li><strong>Resposta Instantânea:</strong> Exibição transparente na tela do status de triagem, score de confiança, dados clínicos extraídos e bucket de destino.</li>
+        <li><strong>Foco na Decisão:</strong> Alerta visual imediato caso o documento seja classificado como Urgente ou exija revisão humana.</li>
+      </ul>
+    </div>
+
+    <div class="card highlight">
+      <div class="card-title">Prompts Estruturados com Google Gemini</div>
+      <ul class="feature-list" style="margin-top: 0.1in;">
+        <li><strong>Classificação Precisa:</strong> Identifica tipo do documento (Laudo, Receita, Atestado, Guia) e especialidade médica correspondente.</li>
+        <li><strong>Extração Semântica:</strong> Mapeia nome e idade do paciente, profissional solicitante, CRM com UF, diagnóstico principal e código CID-10.</li>
+        <li><strong>Structured Outputs:</strong> Modelo configurado para responder exclusivamente schemas JSON estruturados, eliminando alucinações.</li>
+        <li><strong>Tratamento Defensivo:</strong> Parser resiliente para extração de dados mesmo com marcações markdown ou variações na resposta.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="slide-footer">
+    <div>MediFlow · Hackathon ONE G10 · DemoDay No Country</div>
+    <div>Slide 3 de 9</div>
+  </div>
+</div>
+
+<!-- SLIDE 4: CONTRATOS PYDANTIC & REGRAS CLÍNICAS -->
+<div class="slide">
+  <div class="slide-header">
+    <div>
+      <div class="slide-category">Rigor & Validação de Dados</div>
+      <div class="slide-title">Contratos Pydantic e Motor de Regras Clínicas</div>
+    </div>
+    <div class="header-right">
+      <span class="presenter-tag">Apresentação: Lethicia</span>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card highlight">
+      <div class="card-title">Contratos de Dados Estruturados (Pydantic)</div>
+      <ul class="feature-list" style="margin-top: 0.1in;">
+        <li><strong>Tipagem Rígida de Entrada e Saída:</strong> <code>DocumentoEntrada</code>, <code>ClassificacaoDocumento</code>, <code>DadosExtraidos</code> e <code>DecisaoRoteamento</code>.</li>
+        <li><strong>Validação de CRM Médico:</strong> Regex determinístico validando padrão de 4 a 6 dígitos numéricos acompanhados de sigla de UF válida do Brasil.</li>
+        <li><strong>Padronização de Medicamentos & CID-10:</strong> Schema específico para posologia, via de administração, dosagem e hipótese diagnóstica.</li>
+        <li><strong>Imutabilidade Transacional:</strong> Modelos com campos opcionais seguros que evitam inferências indevidas quando dados estão ausentes.</li>
+      </ul>
+    </div>
+
+    <div class="card highlight">
+      <div class="card-title">Cálculo Matemático do Score de Confiança</div>
+      <ul class="feature-list" style="margin-top: 0.1in;">
+        <li><strong>Algoritmo Ponderado:</strong> Avalia completude de dados essenciais (Nome, CRM válido, especialidade, hipótese diagnóstica).</li>
+        <li><strong>Penalizações Automáticas:</strong>
+          <br>• CRM ausente ou inválido: retenção imediata para auditoria.
+          <br>• Caligrafia ilegível ou rasuras detectadas: score reduzido a zero.
+        </li>
+        <li><strong>Detecção Semântica de Urgência:</strong> Busca por termos críticos por palavra inteira, desconsiderando acentos e analisando negações médicas.</li>
+        <li><strong>Garantia de Qualidade:</strong> Centenas de testes unitários garantindo que nenhum caso inconsistente passe sem checagem.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="slide-footer">
+    <div>MediFlow · Hackathon ONE G10 · DemoDay No Country</div>
+    <div>Slide 4 de 9</div>
+  </div>
+</div>
+
+<!-- SLIDE 5: HUMAN-IN-THE-LOOP & PAINEL DE AUDITORIA -->
+<div class="slide">
+  <div class="slide-header">
+    <div>
+      <div class="slide-category">Segurança do Paciente & Compliance</div>
+      <div class="slide-title">Human-in-the-Loop: Painel de Auditoria Clínica</div>
+    </div>
+    <div class="header-right">
+      <span class="presenter-tag">Apresentação: Lethicia</span>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card hitl">
+      <div class="card-title" style="color: #92400e;">Fila de Revisão Humana no Streamlit</div>
+      <div class="card-body">
+        Quando a IA detecta baixa confiança (score &lt; 0.75), rasuras ou CRM em branco, o documento é retido com status <code>pendente_auditoria</code> no bucket <code>mediflow-auditoria-humana</code>.
+      </div>
+      <ul class="feature-list" style="margin-top: 0.15in;">
+        <li><strong>Inspeção Visual do Original:</strong> Auditor visualiza o documento recebido e os dados parciais extraídos pela IA.</li>
+        <li><strong>Formulário de Decisão Auditada:</strong> O auditor escolhe o destino (Rotina, Urgente ou Rejeitado), insere seu nome e justificativa clínica obrigatória.</li>
+        <li><strong>Roteamento Imediato:</strong> A decisão move o arquivo no armazenamento para o bucket correspondente e registra a trilha de auditoria.</li>
+      </ul>
+    </div>
+
+    <div class="card highlight">
+      <div class="card-title">Trilha de Auditoria Imutável</div>
+      <div class="card-body">
+        O sistema não sobrescreve a decisão da IA: ele registra o que o modelo inferiu originalmente e o que o profissional humano retificou.
+      </div>
+      <div style="background: #f1f5f9; border-radius: 8px; padding: 14px; margin-top: 15px; font-size: 0.85rem; font-family: 'JetBrains Mono', monospace; line-height: 1.5; color: #334155;">
+        "auditoria_humana": {<br>
+        &nbsp;&nbsp;"revisor": "Dra. Camila Ramos",<br>
+        &nbsp;&nbsp;"destino_original_ia": "Fila_Revisao_Humana",<br>
+        &nbsp;&nbsp;"destino_aprovado": "Farmacia_Hospitalar",<br>
+        &nbsp;&nbsp;"justificativa": "Receita conferida via contato telefônico com o prescritor.",<br>
+        &nbsp;&nbsp;"data_decisao": "2026-11-11T20:15:00Z"<br>
+        }
+      </div>
+    </div>
+  </div>
+
+  <div class="slide-footer">
+    <div>MediFlow · Hackathon ONE G10 · DemoDay No Country</div>
+    <div>Slide 5 de 9</div>
+  </div>
+</div>
+
+<!-- SLIDE 6: LANGGRAPH & VISÃO MULTIMODAL -->
+<div class="slide">
+  <div class="slide-header">
+    <div>
+      <div class="slide-category">Engenharia de IA & Agentes</div>
+      <div class="slide-title">Grafo LangGraph, Visão Multimodal & Urgência</div>
+    </div>
+    <div class="header-right">
+      <span class="presenter-tag">Apresentação: Ingrid Soares</span>
+    </div>
+  </div>
+
+  <div class="grid-4" style="flex: 0.85;">
+    <div class="card">
+      <span class="pill primary" style="width: fit-content; margin-bottom: 8px;">Nó 1</span>
+      <div class="card-title" style="font-size: 1.05rem;">Ingestão Multimodal</div>
+      <div class="card-body" style="font-size: 0.85rem;">
+        Extração híbrida com <code>pypdf</code> para PDFs digitais nativos e direcionamento de PDFs escaneados ou imagens para a visão do modelo.
+      </div>
+    </div>
+
+    <div class="card">
+      <span class="pill primary" style="width: fit-content; margin-bottom: 8px;">Nó 2</span>
+      <div class="card-title" style="font-size: 1.05rem;">Extração Semântica</div>
+      <div class="card-body" style="font-size: 0.85rem;">
+        Google Gemini 3.5 Flash Lite com Structured Outputs tipados. Motor local determinístico atua como fallback em caso de indisponibilidade da IA.
+      </div>
+    </div>
+
+    <div class="card">
+      <span class="pill primary" style="width: fit-content; margin-bottom: 8px;">Nó 3</span>
+      <div class="card-title" style="font-size: 1.05rem;">Consistência & Urgência</div>
+      <div class="card-body" style="font-size: 0.85rem;">
+        Avaliação matemática de score e detecção de achados críticos (ex: Tromboembolismo Pulmonar Agudo) elevando prioridade para Urgente.
+      </div>
+    </div>
+
+    <div class="card highlight">
+      <span class="pill primary" style="width: fit-content; margin-bottom: 8px;">Aresta Condicional</span>
+      <div class="card-title" style="font-size: 1.05rem;">Roteamento Tripartite</div>
+      <div class="card-body" style="font-size: 0.85rem;">
+        Ramificação estrita:<br>
+        • 🚨 Fila Emergência Médica<br>
+        • ⚠️ Fila Revisão Humana (HITL)<br>
+        • 🏥 Farmácia / PEP / Autorizações
+      </div>
+    </div>
+  </div>
+
+  <div class="card urgent" style="margin-top: 0.2in; flex: 0.65;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+      <strong style="color: #991b1b; font-size: 0.95rem;">🚨 Tratamento de Urgência Médica & Alerta Instantâneo ao Plantão</strong>
+      <span class="pill urgent">Canal Dedicado</span>
+    </div>
+    <div style="font-size: 0.88rem; color: #475569; line-height: 1.5;">
+      Laudos críticos geram uma notificação estruturada instantânea no canal <code>Alerta_Plantao_Medico</code> com os dados do paciente e o achado diagnóstico, encaminhando o arquivo para o bucket de emergência sem passar por filas burocráticas.
+    </div>
+  </div>
+
+  <div class="slide-footer">
+    <div>MediFlow · Hackathon ONE G10 · DemoDay No Country</div>
+    <div>Slide 6 de 9</div>
+  </div>
+</div>
+
+<!-- SLIDE 7: API FASTAPI & NUVEM OCI ALWAYS FREE -->
+<div class="slide">
+  <div class="slide-header">
+    <div>
+      <div class="slide-category">Back-End & Infraestrutura em Nuvem</div>
+      <div class="slide-title">API FastAPI, Nuvem OCI Always Free & Deploy VM</div>
+    </div>
+    <div class="header-right">
+      <span class="presenter-tag">Apresentação: André Teixeira</span>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card highlight">
+      <div class="card-title">Persistência no OCI Object Storage</div>
+      <div class="card-body">
+        Armazenamento segregado em 5 buckets na camada Always Free da Oracle Cloud Infrastructure:
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 7px; margin-top: 10px; font-size: 0.82rem;">
+        <div style="background: #f1f5f9; padding: 6px 12px; border-radius: 6px;">
+          <code>mediflow-recebidos</code>: Cópia íntegra de entrada antes do processamento.
+        </div>
+        <div style="background: #f1f5f9; padding: 6px 12px; border-radius: 6px;">
+          <code>mediflow-rotina</code>: Documentos aprovados (PEP, Farmácia, Autorizações).
+        </div>
+        <div style="background: #f1f5f9; padding: 6px 12px; border-radius: 6px;">
+          <code>mediflow-urgentes</code>: Casos críticos de emergência com alerta.
+        </div>
+        <div style="background: #f1f5f9; padding: 6px 12px; border-radius: 6px;">
+          <code>mediflow-auditoria-humana</code>: Fila de revisão Human-in-the-Loop.
+        </div>
+        <div style="background: #f1f5f9; padding: 6px 12px; border-radius: 6px;">
+          <code>mediflow-rejeitados</code>: Documentos recusados na auditoria clínica.
+        </div>
+      </div>
+    </div>
+
+    <div class="card highlight">
+      <div class="card-title">Deploy na VM OCI Compute & Hardening</div>
+      <ul class="feature-list" style="margin-top: 0.1in;">
+        <li><strong>Deploy Ativo em Produção:</strong> Aplicação rodando em VM Ubuntu na nuvem Oracle Always Free em <code>http://137.131.182.189/</code>.</li>
+        <li><strong>Docker Multi-Stage & Usuário Não-Root:</strong> Imagens enxutas com usuário sem privilégios (<code>mediflow</code>, UID 10001).</li>
+        <li><strong>Reverse Proxy Nginx & Rate Limiting:</strong> Limite de 10 requisições/s, portas internas no loopback e cabeçalhos de proteção.</li>
+        <li><strong>Proteção de Cotas:</strong> Chave de acesso <code>X-API-Key</code>, limite de 15 MB por arquivo e cache em memória (60s) preservando as cotas da OCI.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="slide-footer">
+    <div>MediFlow · Hackathon ONE G10 · DemoDay No Country</div>
+    <div>Slide 7 de 9</div>
+  </div>
+</div>
+
+<!-- SLIDE 8: OS 3 CENÁRIOS OFICIAIS -->
+<div class="slide">
+  <div class="slide-header">
+    <div>
+      <div class="slide-category">Demonstração Prática</div>
+      <div class="slide-title">Validação dos 3 Cenários Obrigatórios</div>
+    </div>
+    <div class="header-right">
+      <span class="presenter-tag">Demonstração ao Vivo</span>
+    </div>
+  </div>
+
+  <div class="grid-3">
+    <!-- Cenário 1 -->
+    <div class="card routine">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+        <span class="pill routine">Cenário 1 · Rotina</span>
+        <strong style="color: #059669; font-size: 0.88rem;">Score: 0.98</strong>
+      </div>
+      <div class="card-title" style="font-size: 1.15rem; color: #065f46;">Hemograma de Rotina</div>
+      <div class="card-body" style="font-size: 0.86rem;">
+        <strong>Documento:</strong> Laudo laboratorial ambulatorial.<br>
+        <strong>Paciente:</strong> Mariana Alcantara (34 anos)<br>
+        <strong>Médico:</strong> Dr. Roberto Viana (CRM 98214-SP)<br>
+        <strong>Achados:</strong> Parâmetros na normalidade.<br>
+        <strong>Destino:</strong> <code>Prontuario_Eletronico</code><br>
+        <strong>Bucket OCI:</strong> <code>mediflow-rotina</code>
+      </div>
+      <div style="margin-top: auto; padding-top: 10px; font-size: 0.8rem; color: #047857; font-weight: 700;">
+        ✔ Fluxo automatizado sem intervenção humana
+      </div>
+    </div>
+
+    <!-- Cenário 2 -->
+    <div class="card urgent">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+        <span class="pill urgent">Cenário 2 · Urgência</span>
+        <strong style="color: #dc2626; font-size: 0.88rem;">Score: 0.99</strong>
+      </div>
+      <div class="card-title" style="font-size: 1.15rem; color: #991b1b;">TEP Agudo (Emergência)</div>
+      <div class="card-body" style="font-size: 0.86rem;">
+        <strong>Documento:</strong> Tomografia de Tórax contrastada.<br>
+        <strong>Paciente:</strong> Carlos Eduardo Mendes (52 anos)<br>
+        <strong>Diagnóstico:</strong> Tromboembolismo Pulmonar Agudo<br>
+        <strong>Alerta Gerado:</strong> Notificação ao <code>Alerta_Plantao_Medico</code><br>
+        <strong>Bucket OCI:</strong> <code>mediflow-urgentes</code>
+      </div>
+      <div style="margin-top: auto; padding-top: 10px; font-size: 0.8rem; color: #b91c1c; font-weight: 700;">
+        🚨 Notificação instantânea para conduta médica
+      </div>
+    </div>
+
+    <!-- Cenário 3 -->
+    <div class="card hitl">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+        <span class="pill hitl">Cenário 3 · HITL</span>
+        <strong style="color: #d97706; font-size: 0.88rem;">Score: 0.00</strong>
+      </div>
+      <div class="card-title" style="font-size: 1.15rem; color: #92400e;">Receita Rasurada / Ilegível</div>
+      <div class="card-body" style="font-size: 0.86rem;">
+        <strong>Documento:</strong> Imagem com carimbo borrado.<br>
+        <strong>Inconsistências:</strong> CRM incompleto e posologia ilegível.<br>
+        <strong>Ação do Agente:</strong> Retido na Fila de Revisão Humana.<br>
+        <strong>Destino:</strong> <code>Fila_Revisao_Humana</code><br>
+        <strong>Bucket OCI:</strong> <code>mediflow-auditoria-humana</code>
+      </div>
+      <div style="margin-top: auto; padding-top: 10px; font-size: 0.8rem; color: #b45309; font-weight: 700;">
+        ⚠️ Segurança e compliance Human-in-the-Loop
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top: 0.22in; background: #f8fafc; border-left: 5px solid #0b4f6c; flex: 0.35;">
+    <div style="font-size: 0.88rem; color: #334155; line-height: 1.45;">
+      <strong>Qualidade Comprovada:</strong> 710 testes automatizados cobrem ponta a ponta os gabaritos, contratos Pydantic, nós do Grafo LangGraph, rotas da API FastAPI e persistência no OCI Object Storage.
+    </div>
+  </div>
+
+  <div class="slide-footer">
+    <div>MediFlow · Hackathon ONE G10 · DemoDay No Country</div>
+    <div>Slide 8 de 9</div>
+  </div>
+</div>
+
+<!-- SLIDE 9: CONCLUSÃO & ACESSO DEMODAY -->
+<div class="slide dark">
+  <div class="slide-header">
+    <div>
+      <div class="slide-category" style="color: #38bdf8;">DemoDay No Country · Talent Dashboard</div>
+      <div class="slide-title">MediFlow: Saúde Inteligente, Rápida e Confiável</div>
+    </div>
+    <div class="header-right">
+      <span class="presenter-tag dark">Conclusão da Equipe</span>
+    </div>
+  </div>
+
+  <div class="grid-2" style="flex: 1;">
+    <div class="card dark">
+      <div class="card-title" style="color: #38bdf8;">Links Oficiais do Projeto</div>
+      <div style="display: flex; flex-direction: column; gap: 14px; margin-top: 15px;">
+        <div style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.15); padding: 12px 16px; border-radius: 8px;">
+          <div style="font-size: 0.78rem; color: #38bdf8; font-weight: 700; text-transform: uppercase;">Aplicação no Ar (OCI Compute)</div>
+          <div style="font-family: 'JetBrains Mono', monospace; font-size: 1.05rem; color: #ffffff; margin-top: 4px;">
+            http://137.131.182.189/
+          </div>
+        </div>
+
+        <div style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.15); padding: 12px 16px; border-radius: 8px;">
+          <div style="font-size: 0.78rem; color: #38bdf8; font-weight: 700; text-transform: uppercase;">Repositório Oficial GitHub</div>
+          <div style="font-family: 'JetBrains Mono', monospace; font-size: 1.05rem; color: #ffffff; margin-top: 4px;">
+            github.com/No-Country-simulation/g10-Brasil27
+          </div>
+        </div>
+
+        <div style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.15); padding: 12px 16px; border-radius: 8px;">
+          <div style="font-size: 0.78rem; color: #38bdf8; font-weight: 700; text-transform: uppercase;">Health Check da API</div>
+          <div style="font-family: 'JetBrains Mono', monospace; font-size: 1.05rem; color: #ffffff; margin-top: 4px;">
+            http://137.131.182.189/api/v1/saude
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card dark" style="text-align: center; justify-content: center;">
+      <div style="font-size: 2.2rem; font-weight: 800; color: #ffffff; margin-bottom: 8px;">
+        Muito Obrigado! 🏥
+      </div>
+      <div style="font-size: 1.05rem; color: #38bdf8; font-weight: 600; margin-bottom: 25px;">
+        Equipe MediFlow · Grupo 10 (g10-Brasil27)
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 0.85rem; color: #cbd5e1; text-align: left; max-width: 4.8in; margin: 0 auto;">
+        <div>• <strong>Guilherme:</strong> Interface & Prompts</div>
+        <div>• <strong>Lethicia:</strong> Contratos & Regras</div>
+        <div>• <strong>Ingrid:</strong> LangGraph & Multimodal</div>
+        <div>• <strong>André:</strong> API, OCI & Deploy</div>
+      </div>
+
+      <div style="margin-top: 30px; font-size: 0.8rem; color: #94a3b8;">
+        Programa ONE · Oracle Next Education · Alura · No Country DemoDay
+      </div>
+    </div>
+  </div>
+
+  <div class="slide-footer">
+    <div>MediFlow · Hackathon ONE G10 · DemoDay No Country</div>
+    <div>Slide 9 de 9</div>
+  </div>
+</div>
+
+</body>
+</html>
