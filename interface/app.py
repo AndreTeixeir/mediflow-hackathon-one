@@ -53,25 +53,203 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Estilos visuais personalizados
+# Estilos visuais personalizados - Tema Clínico Moderno
 st.markdown("""
 <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+    html, body, [class*="css"] {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    /* Cabeçalho e Identidade Visual */
+    .header-container {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 12px;
+        padding-bottom: 4px;
+    }
     .titulo-principal {
-        font-size: 2.2rem;
+        font-size: 2.1rem;
         font-weight: 700;
         color: #0b4f6c;
-        margin-bottom: 0.2rem;
+        margin-bottom: 0.15rem;
+        letter-spacing: -0.02em;
     }
     .subtitulo {
-        font-size: 1.05rem;
-        color: #555;
-        margin-bottom: 1.5rem;
+        font-size: 1.0rem;
+        color: #475569;
+        margin-bottom: 0.5rem;
     }
+    .status-badges {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+    .badge-oci {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: #F0FDF4;
+        color: #166534;
+        border: 1px solid #BBF7D0;
+        padding: 5px 12px;
+        border-radius: 9999px;
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+    .badge-ia {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: #EFF6FF;
+        color: #1E40AF;
+        border: 1px solid #BFDBFE;
+        padding: 5px 12px;
+        border-radius: 9999px;
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+    .pulse-dot {
+        width: 8px;
+        height: 8px;
+        background-color: #22C55E;
+        border-radius: 50%;
+        display: inline-block;
+        box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
+        animation: pulse-green 2s infinite;
+    }
+    @keyframes pulse-green {
+        0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
+        70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); }
+        100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+    }
+
+    /* Cards de Métricas (KPIs do Topo) */
+    div[data-testid="stMetric"] {
+        background: #FFFFFF;
+        border: 1px solid #E2E8F0;
+        border-radius: 10px;
+        padding: 14px 16px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    div[data-testid="stMetric"]:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.07);
+    }
+    div[data-testid="stMetric"] label[data-testid="stMetricLabel"] {
+        font-size: 0.82rem !important;
+        font-weight: 600 !important;
+        color: #475569 !important;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+    }
+    div[data-testid="stMetric"] div[data-testid="stMetricValue"] {
+        font-size: 1.85rem !important;
+        font-weight: 700 !important;
+        color: #0F172A !important;
+    }
+
+    /* Faixas de Destaque por Coluna de Métrica */
+    div[data-testid="column"]:nth-of-type(1) div[data-testid="stMetric"] { border-top: 4px solid #0284C7; }
+    div[data-testid="column"]:nth-of-type(2) div[data-testid="stMetric"] { border-top: 4px solid #F59E0B; }
+    div[data-testid="column"]:nth-of-type(3) div[data-testid="stMetric"] { border-top: 4px solid #EF4444; }
+    div[data-testid="column"]:nth-of-type(4) div[data-testid="stMetric"] { border-top: 4px solid #10B981; }
+    div[data-testid="column"]:nth-of-type(5) div[data-testid="stMetric"] { border-top: 4px solid #64748B; }
+
+    /* Abas de Navegação */
+    div[data-baseweb="tab-list"] {
+        gap: 8px;
+        border-bottom: 2px solid #E2E8F0;
+        padding-bottom: 2px;
+    }
+    button[data-baseweb="tab"] {
+        border-radius: 6px 6px 0 0 !important;
+        font-weight: 600 !important;
+        font-size: 0.95rem !important;
+        padding: 8px 16px !important;
+        transition: all 0.2s ease;
+    }
+
+    /* Botões de Ação */
+    button[kind="primary"] {
+        background: linear-gradient(135deg, #0284C7 0%, #0369A1 100%) !important;
+        border: none !important;
+        color: #FFFFFF !important;
+        font-weight: 600 !important;
+        border-radius: 8px !important;
+        box-shadow: 0 2px 4px rgba(2, 132, 199, 0.25) !important;
+        transition: all 0.2s ease !important;
+    }
+    button[kind="primary"]:hover {
+        box-shadow: 0 4px 12px rgba(2, 132, 199, 0.35) !important;
+        transform: translateY(-1px);
+    }
+    button[kind="secondary"] {
+        border-radius: 8px !important;
+        font-weight: 500 !important;
+        transition: all 0.15s ease !important;
+    }
+
+    /* Cards e Containers */
     .card-destaque {
         background-color: #f8f9fa;
         border-radius: 8px;
         padding: 16px;
         border-left: 5px solid #0b4f6c;
+    }
+    .card-clinico-resultado {
+        background: #FFFFFF;
+        border: 1px solid #E2E8F0;
+        border-radius: 10px;
+        padding: 16px 20px;
+        margin-bottom: 16px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .tag-prioridade-urgente {
+        display: inline-block;
+        background: #FEE2E2;
+        color: #991B1B;
+        font-weight: 700;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: 0.85rem;
+    }
+    .tag-prioridade-alta {
+        display: inline-block;
+        background: #FEF3C7;
+        color: #92400E;
+        font-weight: 700;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: 0.85rem;
+    }
+    .tag-prioridade-rotina {
+        display: inline-block;
+        background: #D1FAE5;
+        color: #065F46;
+        font-weight: 700;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: 0.85rem;
+    }
+
+    /* Rodapé Institucional */
+    .mediflow-footer {
+        margin-top: 40px;
+        padding: 20px 0 10px 0;
+        border-top: 1px solid #E2E8F0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 10px;
+        color: #64748B;
+        font-size: 0.82rem;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -146,8 +324,18 @@ def tipo_pela_extensao(nome_arquivo: str) -> str:
 # CABEÇALHO E CONTADORES (preenchidos no fim do script, depois de enviar ou decidir)
 # ============================================================================
 
-st.markdown('<div class="titulo-principal">🏥 MediFlow — Triagem e Auditoria Clínica</div>', unsafe_allow_html=True)
-st.markdown('<div class="subtitulo">Agente Autônomo para Triagem, Extração e Roteamento de Documentos Clínicos | OCI Always Free</div>', unsafe_allow_html=True)
+st.markdown("""
+<div class="header-container">
+    <div>
+        <div class="titulo-principal">🏥 MediFlow — Triagem e Auditoria Clínica</div>
+        <div class="subtitulo">Agente Autônomo para Triagem, Extração e Roteamento de Documentos Clínicos | OCI Always Free</div>
+    </div>
+    <div class="status-badges">
+        <span class="badge-oci"><span class="pulse-dot"></span> VM OCI Always Free Ativa</span>
+        <span class="badge-ia">⚡ Gemini 3.5 Flash-Lite</span>
+    </div>
+</div>
+""", unsafe_allow_html=True)
 
 # O Streamlit desenha na ordem do script. Os contadores ficam no topo da tela mas são preenchidos
 # no fim, depois de uma triagem enviada ou de uma decisão registrada nesta mesma execução.
@@ -238,6 +426,60 @@ with tab_envio:
             else:
                 st.success("✅ Triagem processada com sucesso via API FastAPI + Grafo LangGraph!")
                 recarregar_dados()  # a fila, o histórico e os contadores passam a incluir este documento
+
+                classif = resultado.get("classificacao") or {}
+                roteamento = resultado.get("decisao_roteamento") or {}
+                dados = resultado.get("dados_extraidos") or {}
+                pac = dados.get("paciente") or {}
+                med = dados.get("medico_solicitante") or {}
+
+                prioridade = classif.get("nivel_prioridade", "N/A")
+                score = classif.get("score_confianca", 0.0)
+                destino = roteamento.get("destino_principal", "N/A")
+                bucket = (resultado.get("armazenamento_oci") or {}).get("bucket", "N/A")
+
+                tag_classe = (
+                    "tag-prioridade-urgente" if "URG" in str(prioridade).upper() or "EMERG" in str(destino).upper()
+                    else ("tag-prioridade-alta" if "ALTA" in str(prioridade).upper() else "tag-prioridade-rotina")
+                )
+
+                st.markdown(
+                    f"""
+                    <div class="card-clinico-resultado">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+                            <div style="font-weight: 700; font-size: 1.05rem; color: #0F172A;">
+                                📄 Resumo Clínico da Triagem — <code>{resultado.get('documento_id', '')}</code>
+                            </div>
+                            <div>
+                                <span class="{tag_classe}">{prioridade}</span>
+                            </div>
+                        </div>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; font-size: 0.88rem;">
+                            <div>
+                                <div style="color: #64748B; font-size: 0.75rem; text-transform: uppercase; font-weight: 600;">Tipo do Documento</div>
+                                <div style="font-weight: 600; color: #1E293B;">{classif.get('tipo_documento', 'N/A')}</div>
+                                <div style="color: #64748B; font-size: 0.75rem; margin-top: 2px;">Confiança: <b>{score * 100:.1f}%</b></div>
+                            </div>
+                            <div>
+                                <div style="color: #64748B; font-size: 0.75rem; text-transform: uppercase; font-weight: 600;">Destino & OCI</div>
+                                <div style="font-weight: 600; color: #0284C7;">{destino}</div>
+                                <div style="color: #64748B; font-size: 0.75rem; margin-top: 2px;">Bucket: <code>{bucket}</code></div>
+                            </div>
+                            <div>
+                                <div style="color: #64748B; font-size: 0.75rem; text-transform: uppercase; font-weight: 600;">Paciente</div>
+                                <div style="font-weight: 600; color: #1E293B;">{pac.get('nome') or 'Não identificado'} ({pac.get('idade') or '-'} anos)</div>
+                                <div style="color: #64748B; font-size: 0.75rem; margin-top: 2px;">CID: <b>{dados.get('cid_sugerido') or 'N/A'}</b></div>
+                            </div>
+                            <div>
+                                <div style="color: #64748B; font-size: 0.75rem; text-transform: uppercase; font-weight: 600;">Médico Solicitante</div>
+                                <div style="font-weight: 600; color: #1E293B;">{med.get('nome') or 'Não identificado'}</div>
+                                <div style="color: #64748B; font-size: 0.75rem; margin-top: 2px;">CRM: <b>{med.get('crm') or 'N/A'}</b></div>
+                            </div>
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
 
                 st.markdown("### Resultado da Triagem:")
                 col_r1, col_r2 = st.columns(2)
@@ -384,6 +626,16 @@ with tab_historico:
     st.subheader("📦 Histórico dos Documentos no Armazenamento")
     st.caption("Organização segregada de arquivos conforme exigido pelo edital Always Free da Oracle.")
 
+    st.markdown("""
+    <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px;">
+        <span style="background: #F1F5F9; border: 1px solid #CBD5E1; padding: 4px 8px; border-radius: 6px; font-size: 0.78rem; color: #334155;">📥 <code>mediflow-recebidos</code> (Ingestão)</span>
+        <span style="background: #ECFDF5; border: 1px solid #A7F3D0; padding: 4px 8px; border-radius: 6px; font-size: 0.78rem; color: #065F46;">✅ <code>mediflow-rotina</code> (Farmácia / PEP / Autorizações)</span>
+        <span style="background: #FEF2F2; border: 1px solid #FECACA; padding: 4px 8px; border-radius: 6px; font-size: 0.78rem; color: #991B1B;">🚨 <code>mediflow-urgentes</code> (Emergência)</span>
+        <span style="background: #FFFBEB; border: 1px solid #FDE68A; padding: 4px 8px; border-radius: 6px; font-size: 0.78rem; color: #92400E;">🔍 <code>mediflow-auditoria</code> (Revisão Humana)</span>
+        <span style="background: #F8FAFC; border: 1px solid #E2E8F0; padding: 4px 8px; border-radius: 6px; font-size: 0.78rem; color: #475569;">🚫 <code>mediflow-rejeitados</code> (Falhas / Rejeição)</span>
+    </div>
+    """, unsafe_allow_html=True)
+
     historico, erro_do_historico = ler(carregar_historico)
     if erro_do_historico:
         mostrar_erro(erro_do_historico)
@@ -429,3 +681,14 @@ with area_dos_contadores:
             st.metric(label="✅ Rotina", value=sum(1 for h in historico if h["destino_principal"] in DESTINOS_DE_ROTINA))
         with col_m5:
             st.metric(label="🚫 Rejeitados", value=sum(1 for h in historico if h["status"] == "rejeitado"))
+
+st.markdown("""
+<div class="mediflow-footer">
+    <div>
+        <strong>🏥 MediFlow</strong> · Sistema Autônomo de Roteamento Clínico · <em>Hackathon ONE G10</em>
+    </div>
+    <div>
+        <strong>Equipe:</strong> André · Ingrid · Guilherme · Lethicia | <strong>Infra:</strong> OCI VM Always Free & Object Storage
+    </div>
+</div>
+""", unsafe_allow_html=True)
