@@ -4,6 +4,10 @@
 
 Projeto do **Hackathon ONE G10** (Oracle Next Education e Alura).
 
+**Projeto em equipe:** Guilherme Araujo Silva · Ingrid Soares · Lethicia Almeida · André Teixeira — veja [quem fez o quê](#equipe).
+
+Repositório oficial da equipe: [No-Country-simulation/g10-Brasil27](https://github.com/No-Country-simulation/g10-Brasil27).
+
 [![Testes](https://github.com/No-Country-simulation/g10-Brasil27/actions/workflows/testes.yml/badge.svg)](https://github.com/No-Country-simulation/g10-Brasil27/actions/workflows/testes.yml)
 [![Python 3.13](https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white)](requirements.txt)
 [![Deploy: OCI Always Free](https://img.shields.io/badge/Deploy-OCI%20Always%20Free-C74634?logo=oracle&logoColor=white)](docs/deploy-oci.md)
