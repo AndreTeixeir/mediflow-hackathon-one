@@ -145,7 +145,7 @@ A ordem abaixo é a do código (`agente/grafo.py` e `regras/regras_clinicas.py`)
 flowchart TD
     A["Documento recebido<br/>texto, PDF ou imagem"] --> B["Ingestão e leitura"]
     B --> C{"O arquivo abriu?"}
-    C -->|"Não"| R["Fila_Revisao_Humana<br/>bucket mediflow-auditoria-humana<br/>o arquivo não vai ao Gemini"]
+    C -->|"Não (não vai ao Gemini)"| R["Fila_Revisao_Humana<br/>bucket mediflow-auditoria-humana"]
     C -->|"Sim"| D["Classificação e extração<br/>Gemini, ou motor local sem chave"]
     D --> E["Score de confiança e pendências"]
     E --> F{"Urgência crítica?"}
