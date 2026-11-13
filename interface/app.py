@@ -251,6 +251,136 @@ st.markdown("""
         color: #64748B;
         font-size: 0.82rem;
     }
+
+    /* ========================================================================
+       MODERN HEALTH TECH / SHADCN UI SYSTEM
+       ======================================================================== */
+
+    /* Container do Formulário de Auditoria Clínica */
+    div[data-testid="stForm"] {
+        background: #FFFFFF !important;
+        border: 1px solid #E2E8F0 !important;
+        border-radius: 14px !important;
+        padding: 22px 24px !important;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05) !important;
+    }
+
+    /* Campos Desabilitados: Aparência de Badges de Inspeção de Alta Definição */
+    div[data-testid="stTextInput"] input:disabled {
+        background-color: #F8FAFC !important;
+        color: #0F172A !important;
+        -webkit-text-fill-color: #0F172A !important;
+        font-weight: 600 !important;
+        font-size: 0.92rem !important;
+        border: 1px solid #E2E8F0 !important;
+        border-radius: 8px !important;
+        padding: 10px 14px !important;
+        box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.02) !important;
+    }
+
+    /* Campos Ativos (Input e Textarea) */
+    div[data-testid="stTextInput"] input:not(:disabled),
+    div[data-testid="stTextArea"] textarea {
+        background-color: #FFFFFF !important;
+        border: 1px solid #CBD5E1 !important;
+        border-radius: 8px !important;
+        font-size: 0.95rem !important;
+        color: #0F172A !important;
+        transition: all 0.2s ease !important;
+    }
+    div[data-testid="stTextInput"] input:not(:disabled):focus,
+    div[data-testid="stTextArea"] textarea:focus {
+        border-color: #0284C7 !important;
+        box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15) !important;
+        outline: none !important;
+    }
+
+    /* Labels dos Campos */
+    label[data-testid="stWidgetLabel"] p {
+        font-size: 0.82rem !important;
+        font-weight: 600 !important;
+        color: #475569 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.03em !important;
+        margin-bottom: 4px !important;
+    }
+
+    /* Radio Buttons estilo Segmented Control (Pills Modernos) */
+    div[data-testid="stRadio"] div[role="radiogroup"] {
+        display: flex !important;
+        gap: 8px !important;
+        background: #F1F5F9 !important;
+        padding: 5px !important;
+        border-radius: 10px !important;
+        border: 1px solid #E2E8F0 !important;
+    }
+    div[data-testid="stRadio"] div[role="radiogroup"] label {
+        flex: 1 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        background: transparent !important;
+        border-radius: 8px !important;
+        padding: 8px 14px !important;
+        font-weight: 600 !important;
+        font-size: 0.88rem !important;
+        color: #475569 !important;
+        transition: all 0.2s ease !important;
+        cursor: pointer !important;
+        border: 1px solid transparent !important;
+    }
+    div[data-testid="stRadio"] div[role="radiogroup"] label:hover {
+        background: #E2E8F0 !important;
+        color: #0F172A !important;
+    }
+    /* Oculta o marcador circular de rádio nativo */
+    div[data-testid="stRadio"] div[role="radiogroup"] label > div:first-child {
+        display: none !important;
+    }
+    div[data-testid="stRadio"] div[role="radiogroup"] label:has(input:checked) {
+        background: #FFFFFF !important;
+        color: #0284C7 !important;
+        border: 1px solid #CBD5E1 !important;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08) !important;
+    }
+
+    /* Selectbox Moderno */
+    div[data-testid="stSelectbox"] > div {
+        border-radius: 8px !important;
+        border: 1px solid #CBD5E1 !important;
+        background-color: #FFFFFF !important;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04) !important;
+    }
+
+    /* Alert / Warning estilo Banner Moderno */
+    div[data-testid="stAlert"] {
+        border-radius: 10px !important;
+        border: 1px solid #FCD34D !important;
+        background-color: #FFFBEB !important;
+        color: #92400E !important;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03) !important;
+        padding: 12px 16px !important;
+    }
+
+    /* Barra de Progresso com Gradiente */
+    div[data-testid="stProgress"] > div {
+        height: 10px !important;
+        border-radius: 9999px !important;
+        background-color: #E2E8F0 !important;
+    }
+    div[data-testid="stProgress"] > div > div {
+        border-radius: 9999px !important;
+        background: linear-gradient(90deg, #EF4444 0%, #F59E0B 50%, #10B981 100%) !important;
+    }
+
+    /* Card Dossiê da Auditoria (Coluna Esquerda) */
+    .card-dossie-auditoria {
+        background: #FFFFFF;
+        border: 1px solid #E2E8F0;
+        border-radius: 14px;
+        padding: 22px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    }
 </style>
 """, unsafe_allow_html=True)
 
