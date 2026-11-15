@@ -3,9 +3,9 @@
 > **Projeto:** Projeto 2 – 🏥 MediFlow – Agente Autônomo para Triagem, Extração e Roteamento de Documentos Clínicos  
 > **Hackathon:** ONE G10 (Oracle Next Education & Alura)  
 > **Repositório:** `No-Country-simulation/g10-Brasil27`  
-> **Branch de Trabalho:** `feature/agente-deploy-ingrid` (PR #2 – Aprovado e pronto para merge na `main`)  
-> **Responsável:** Ingrid Soares — *Grafo de IA (LangGraph), Visão Multimodal / OCR, Segurança, Redes & Deploy OCI*  
-> **Última Atualização:** 28/10/2026
+> **Branch de Trabalho:** `feature/agente-deploy-ingrid` (PR #2 – Mergeado na `main`), `docs/ajustes-readme-slides-demoday` (PR #8 – Mergeado) e `feature/melhorias-visual-frontend` (PR #9 – Mergeado)  
+> **Responsável:** Ingrid Soares — *Grafo de IA (LangGraph), Visão Multimodal / OCR, Frontend React / Streamlit, Segurança, Redes & Deploy OCI*  
+> **Última Atualização:** 15/11/2026
 
 ---
 
@@ -39,8 +39,13 @@ Implementação do motor de orquestração autônomo com **LangGraph (`StateGrap
 - **`deploy/nginx_mediflow.conf`** e **`deploy/setup_oci_vm.sh`**: Reverse Proxy Nginx na porta `80`/`443` com *rate-limiting* (`10r/s`) e firewall UFW liberando apenas `22/tcp`, `80/tcp` e `443/tcp` para proteger a conta OCI.
 
 ### 1.5. Code Reviews e Integração Realizados pela Ingrid
-- **PR #1 (`feature/contratos-lethicia` — Leticia):** Revisado, testado com o Grafo e aprovado/mergeado na `main` (`1f742e5`).
+- **PR #1 (`feature/contratos-lethicia` — Lethicia):** Revisado, testado com o Grafo e aprovado/mergeado na `main` (`1f742e5`).
 - **PR #3 (`feat/api-triagem` — André):** Revisado, validado com os 90 testes automatizados e aprovado/mergeado na `main` (`89c13a4`).
+
+### 1.6. Frontend Moderno em React e Aprimoramento de UX/UI
+- **Frontend React (`frontend/`):** Aplicação moderna construída com React 18, Vite, Tailwind CSS e Lucide React, com tema dark refinado e integração completa com a API REST.
+- **Modernização do Streamlit (`interface/app.py`):** Cards clínicos de triagem, segmented controls na auditoria e métricas visuais no painel principal.
+- **Apresentação e Slides do DemoDay (`docs/`):** Atualização dos papéis reais da equipe no pitch, diagramas OCI e regeneração do slide oficial em alta resolução (`docs/Img_slide.png`).
 
 ---
 
@@ -66,7 +71,7 @@ Implementação do motor de orquestração autônomo com **LangGraph (`StateGrap
 ## 🔄 3. Checklist de Progresso e Próximos Passos
 
 - [x] Sincronização do repositório `g10-Brasil27`.
-- [x] Code Review e Merge do **PR #1** da Leticia (`contratos/` e `regras/`).
+- [x] Code Review e Merge do **PR #1** da Lethicia (`contratos/` e `regras/`).
 - [x] Implementação do Grafo LangGraph (`agente/grafo.py`), Leitura/Visão Multimodal (`agente/leitor_documentos.py`, `agente/visao_multimodal.py`), Prompts (`prompts/`) e Testes (`tests/test_agente.py`).
 - [x] Implementação da infraestrutura Docker, Nginx e script de firewall OCI (`deploy/`).
 - [x] Resolução de todos os pontos de integração da Fase 1 atribuídos à Ingrid (`E1`, `E5`, `E6`, `E7`, `E8`).
