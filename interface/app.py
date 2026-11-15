@@ -572,57 +572,58 @@ with tab_envio:
                 med = dados.get("medico_solicitante") or {}
 
                 prioridade = classif.get("nivel_prioridade", "N/A")
-                score = classif.get("score_confianca_classificacao", classif.get("score_confianca", 0.0))
+                score = classif.get("score_confianca_classificacao", 0.0)
                 destino = roteamento.get("destino_principal", "N/A")
                 bucket = (resultado.get("armazenamento_oci") or {}).get("bucket", "N/A")
+
+                # Escapa todos os valores dinâmicos antes de inseri-los no HTML.
+                documento_id_html = html.escape(str(resultado.get("documento_id", "")))
+                prioridade_html = html.escape(str(prioridade))
+                tipo_html = html.escape(str(classif.get("tipo_documento", "N/A")))
+                destino_html = html.escape(str(destino))
+                bucket_html = html.escape(str(bucket))
+                nome_html = html.escape(str(pac.get("nome") or "Não identificado"))
+                idade_html = html.escape(str(pac.get("idade") or "-"))
+                cid_html = html.escape(str(dados.get("cid_sugerido") or "N/A"))
+                medico_html = html.escape(str(med.get("nome") or "Não identificado"))
+                crm_html = html.escape(str(med.get("crm") or "N/A"))
 
                 tag_classe = (
                     "tag-prioridade-urgente" if "URG" in str(prioridade).upper() or "EMERG" in str(destino).upper()
                     else ("tag-prioridade-alta" if "ALTA" in str(prioridade).upper() else "tag-prioridade-rotina")
                 )
 
-                doc_id_esc = html.escape(str(resultado.get("documento_id", "")))
-                prioridade_esc = html.escape(str(prioridade))
-                tipo_doc_esc = html.escape(str(classif.get("tipo_documento", "N/A")))
-                destino_esc = html.escape(str(destino))
-                bucket_esc = html.escape(str(bucket))
-                paciente_nome_esc = html.escape(str(pac.get("nome") or "Não identificado"))
-                paciente_idade_esc = html.escape(str(pac.get("idade") or "-"))
-                cid_esc = html.escape(str(dados.get("cid_sugerido") or "N/A"))
-                medico_nome_esc = html.escape(str(med.get("nome") or "Não identificado"))
-                medico_crm_esc = html.escape(str(med.get("crm") or "N/A"))
-
                 st.markdown(
                     f"""
                     <div class="card-clinico-resultado">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
                             <div style="font-weight: 700; font-size: 1.05rem; color: #0F172A;">
-                                📄 Resumo Clínico da Triagem — <code>{doc_id_esc}</code>
+                                📄 Resumo Clínico da Triagem — <code>{documento_id_html}</code>
                             </div>
                             <div>
-                                <span class="{tag_classe}">{prioridade_esc}</span>
+                                <span class="{tag_classe}">{prioridade_html}</span>
                             </div>
                         </div>
                         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; font-size: 0.88rem;">
                             <div>
                                 <div style="color: #64748B; font-size: 0.75rem; text-transform: uppercase; font-weight: 600;">Tipo do Documento</div>
-                                <div style="font-weight: 600; color: #1E293B;">{tipo_doc_esc}</div>
+                                <div style="font-weight: 600; color: #1E293B;">{tipo_html}</div>
                                 <div style="color: #64748B; font-size: 0.75rem; margin-top: 2px;">Confiança: <b>{score * 100:.1f}%</b></div>
                             </div>
                             <div>
                                 <div style="color: #64748B; font-size: 0.75rem; text-transform: uppercase; font-weight: 600;">Destino & OCI</div>
-                                <div style="font-weight: 600; color: #0284C7;">{destino_esc}</div>
-                                <div style="color: #64748B; font-size: 0.75rem; margin-top: 2px;">Bucket: <code>{bucket_esc}</code></div>
+                                <div style="font-weight: 600; color: #0284C7;">{destino_html}</div>
+                                <div style="color: #64748B; font-size: 0.75rem; margin-top: 2px;">Bucket: <code>{bucket_html}</code></div>
                             </div>
                             <div>
                                 <div style="color: #64748B; font-size: 0.75rem; text-transform: uppercase; font-weight: 600;">Paciente</div>
-                                <div style="font-weight: 600; color: #1E293B;">{paciente_nome_esc} ({paciente_idade_esc} anos)</div>
-                                <div style="color: #64748B; font-size: 0.75rem; margin-top: 2px;">CID: <b>{cid_esc}</b></div>
+                                <div style="font-weight: 600; color: #1E293B;">{nome_html} ({idade_html} anos)</div>
+                                <div style="color: #64748B; font-size: 0.75rem; margin-top: 2px;">CID: <b>{cid_html}</b></div>
                             </div>
                             <div>
                                 <div style="color: #64748B; font-size: 0.75rem; text-transform: uppercase; font-weight: 600;">Médico Solicitante</div>
-                                <div style="font-weight: 600; color: #1E293B;">{medico_nome_esc}</div>
-                                <div style="color: #64748B; font-size: 0.75rem; margin-top: 2px;">CRM: <b>{medico_crm_esc}</b></div>
+                                <div style="font-weight: 600; color: #1E293B;">{medico_html}</div>
+                                <div style="color: #64748B; font-size: 0.75rem; margin-top: 2px;">CRM: <b>{crm_html}</b></div>
                             </div>
                         </div>
                     </div>
