@@ -11,6 +11,7 @@ continua lá depois de recarregar a página. Se a API falhar, a tela mostra o er
 """
 
 import base64
+import html
 import uuid
 from datetime import datetime
 
@@ -571,7 +572,7 @@ with tab_envio:
                 med = dados.get("medico_solicitante") or {}
 
                 prioridade = classif.get("nivel_prioridade", "N/A")
-                score = classif.get("score_confianca", 0.0)
+                score = classif.get("score_confianca_classificacao", classif.get("score_confianca", 0.0))
                 destino = roteamento.get("destino_principal", "N/A")
                 bucket = (resultado.get("armazenamento_oci") or {}).get("bucket", "N/A")
 
@@ -580,37 +581,48 @@ with tab_envio:
                     else ("tag-prioridade-alta" if "ALTA" in str(prioridade).upper() else "tag-prioridade-rotina")
                 )
 
+                doc_id_esc = html.escape(str(resultado.get("documento_id", "")))
+                prioridade_esc = html.escape(str(prioridade))
+                tipo_doc_esc = html.escape(str(classif.get("tipo_documento", "N/A")))
+                destino_esc = html.escape(str(destino))
+                bucket_esc = html.escape(str(bucket))
+                paciente_nome_esc = html.escape(str(pac.get("nome") or "Não identificado"))
+                paciente_idade_esc = html.escape(str(pac.get("idade") or "-"))
+                cid_esc = html.escape(str(dados.get("cid_sugerido") or "N/A"))
+                medico_nome_esc = html.escape(str(med.get("nome") or "Não identificado"))
+                medico_crm_esc = html.escape(str(med.get("crm") or "N/A"))
+
                 st.markdown(
                     f"""
                     <div class="card-clinico-resultado">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
                             <div style="font-weight: 700; font-size: 1.05rem; color: #0F172A;">
-                                📄 Resumo Clínico da Triagem — <code>{resultado.get('documento_id', '')}</code>
+                                📄 Resumo Clínico da Triagem — <code>{doc_id_esc}</code>
                             </div>
                             <div>
-                                <span class="{tag_classe}">{prioridade}</span>
+                                <span class="{tag_classe}">{prioridade_esc}</span>
                             </div>
                         </div>
                         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; font-size: 0.88rem;">
                             <div>
                                 <div style="color: #64748B; font-size: 0.75rem; text-transform: uppercase; font-weight: 600;">Tipo do Documento</div>
-                                <div style="font-weight: 600; color: #1E293B;">{classif.get('tipo_documento', 'N/A')}</div>
+                                <div style="font-weight: 600; color: #1E293B;">{tipo_doc_esc}</div>
                                 <div style="color: #64748B; font-size: 0.75rem; margin-top: 2px;">Confiança: <b>{score * 100:.1f}%</b></div>
                             </div>
                             <div>
                                 <div style="color: #64748B; font-size: 0.75rem; text-transform: uppercase; font-weight: 600;">Destino & OCI</div>
-                                <div style="font-weight: 600; color: #0284C7;">{destino}</div>
-                                <div style="color: #64748B; font-size: 0.75rem; margin-top: 2px;">Bucket: <code>{bucket}</code></div>
+                                <div style="font-weight: 600; color: #0284C7;">{destino_esc}</div>
+                                <div style="color: #64748B; font-size: 0.75rem; margin-top: 2px;">Bucket: <code>{bucket_esc}</code></div>
                             </div>
                             <div>
                                 <div style="color: #64748B; font-size: 0.75rem; text-transform: uppercase; font-weight: 600;">Paciente</div>
-                                <div style="font-weight: 600; color: #1E293B;">{pac.get('nome') or 'Não identificado'} ({pac.get('idade') or '-'} anos)</div>
-                                <div style="color: #64748B; font-size: 0.75rem; margin-top: 2px;">CID: <b>{dados.get('cid_sugerido') or 'N/A'}</b></div>
+                                <div style="font-weight: 600; color: #1E293B;">{paciente_nome_esc} ({paciente_idade_esc} anos)</div>
+                                <div style="color: #64748B; font-size: 0.75rem; margin-top: 2px;">CID: <b>{cid_esc}</b></div>
                             </div>
                             <div>
                                 <div style="color: #64748B; font-size: 0.75rem; text-transform: uppercase; font-weight: 600;">Médico Solicitante</div>
-                                <div style="font-weight: 600; color: #1E293B;">{med.get('nome') or 'Não identificado'}</div>
-                                <div style="color: #64748B; font-size: 0.75rem; margin-top: 2px;">CRM: <b>{med.get('crm') or 'N/A'}</b></div>
+                                <div style="font-weight: 600; color: #1E293B;">{medico_nome_esc}</div>
+                                <div style="color: #64748B; font-size: 0.75rem; margin-top: 2px;">CRM: <b>{medico_crm_esc}</b></div>
                             </div>
                         </div>
                     </div>
@@ -768,7 +780,7 @@ with tab_historico:
         <span style="background: #F1F5F9; border: 1px solid #CBD5E1; padding: 4px 8px; border-radius: 6px; font-size: 0.78rem; color: #334155;">📥 <code>mediflow-recebidos</code> (Ingestão)</span>
         <span style="background: #ECFDF5; border: 1px solid #A7F3D0; padding: 4px 8px; border-radius: 6px; font-size: 0.78rem; color: #065F46;">✅ <code>mediflow-rotina</code> (Farmácia / PEP / Autorizações)</span>
         <span style="background: #FEF2F2; border: 1px solid #FECACA; padding: 4px 8px; border-radius: 6px; font-size: 0.78rem; color: #991B1B;">🚨 <code>mediflow-urgentes</code> (Emergência)</span>
-        <span style="background: #FFFBEB; border: 1px solid #FDE68A; padding: 4px 8px; border-radius: 6px; font-size: 0.78rem; color: #92400E;">🔍 <code>mediflow-auditoria</code> (Revisão Humana)</span>
+        <span style="background: #FFFBEB; border: 1px solid #FDE68A; padding: 4px 8px; border-radius: 6px; font-size: 0.78rem; color: #92400E;">🔍 <code>mediflow-auditoria-humana</code> (Revisão Humana)</span>
         <span style="background: #F8FAFC; border: 1px solid #E2E8F0; padding: 4px 8px; border-radius: 6px; font-size: 0.78rem; color: #475569;">🚫 <code>mediflow-rejeitados</code> (Falhas / Rejeição)</span>
     </div>
     """, unsafe_allow_html=True)
