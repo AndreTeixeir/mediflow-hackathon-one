@@ -120,7 +120,7 @@ Saída esperada: a palavra `docker` e a versão do plugin do compose.
 
 ### 3.1. Os cinco buckets
 
-Crie cinco buckets **privados**, um por status do documento, todos com o prefixo `mediflow` (é o valor de `OCI_BUCKET_PREFIXO`):
+Crie cinco buckets **privados**, um para a entrada dos documentos e quatro para os destinos, todos com o prefixo `mediflow` (é o valor de `OCI_BUCKET_PREFIXO`):
 
 | Bucket | Recebe |
 |---|---|
@@ -299,9 +299,9 @@ curl -s -o /dev/null -w "%{http_code} %{redirect_url}\n" http://<IP-da-VM>/
 
 Esperado: `200`, sem URL de redirecionamento.
 
-**4. O painel abre e processa um documento.** No navegador, abra `http://<IP-da-VM>/`, envie um dos textos de `dados_teste/` (aba "📤 Envio e Triagem de Documentos") e confira que o objeto apareceu no bucket do destino pelo console da OCI (tela do passo 3.1).
+**4. O painel abre e processa um documento.** No navegador, abra `http://<IP-da-VM>/`, envie um dos textos de `dados_teste/` (aba "Envio e Triagem de Documentos") e confira que o objeto apareceu no bucket do destino pelo console da OCI (tela do passo 3.1).
 
-**5. A gravação é na OCI.** O documento enviado aparece na aba "📊 Histórico & Buckets OCI" com o nome do bucket (`mediflow-rotina`, `mediflow-urgentes` ou `mediflow-auditoria-humana`).
+**5. A gravação é na OCI.** O documento enviado aparece na aba "Histórico & Buckets OCI" com o nome do bucket (`mediflow-rotina`, `mediflow-urgentes` ou `mediflow-auditoria-humana`).
 
 ---
 

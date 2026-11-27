@@ -11,6 +11,7 @@ continua lá depois de recarregar a página. Se a API falhar, a tela mostra o er
 """
 
 import base64
+import html
 import uuid
 from datetime import datetime
 
@@ -53,25 +54,340 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Estilos visuais personalizados
+# Estilos visuais personalizados - Tema Clínico Moderno
 st.markdown("""
 <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+    html, body, [class*="css"] {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    /* Cabeçalho e Identidade Visual */
+    .header-container {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 12px;
+        padding-bottom: 4px;
+    }
     .titulo-principal {
-        font-size: 2.2rem;
+        font-size: 2.1rem;
         font-weight: 700;
         color: #0b4f6c;
-        margin-bottom: 0.2rem;
+        margin-bottom: 0.15rem;
+        letter-spacing: -0.02em;
     }
     .subtitulo {
-        font-size: 1.05rem;
-        color: #555;
-        margin-bottom: 1.5rem;
+        font-size: 1.0rem;
+        color: #475569;
+        margin-bottom: 0.5rem;
     }
+    .status-badges {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+    .badge-oci {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: #F0FDF4;
+        color: #166534;
+        border: 1px solid #BBF7D0;
+        padding: 5px 12px;
+        border-radius: 9999px;
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+    .badge-ia {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: #EFF6FF;
+        color: #1E40AF;
+        border: 1px solid #BFDBFE;
+        padding: 5px 12px;
+        border-radius: 9999px;
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+    .pulse-dot {
+        width: 8px;
+        height: 8px;
+        background-color: #22C55E;
+        border-radius: 50%;
+        display: inline-block;
+        box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
+        animation: pulse-green 2s infinite;
+    }
+    @keyframes pulse-green {
+        0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
+        70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); }
+        100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+    }
+
+    /* Cards de Métricas (KPIs do Topo) - Tema Escuro Integrado */
+    div[data-testid="stMetric"] {
+        background: #1E293B !important;
+        border: 1px solid #334155 !important;
+        border-radius: 10px;
+        padding: 14px 16px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    div[data-testid="stMetric"]:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    }
+    div[data-testid="stMetric"] label[data-testid="stMetricLabel"] {
+        font-size: 0.82rem !important;
+        font-weight: 600 !important;
+        color: #94A3B8 !important;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+    }
+    div[data-testid="stMetric"] div[data-testid="stMetricValue"] {
+        font-size: 1.85rem !important;
+        font-weight: 700 !important;
+        color: #F8FAFC !important;
+    }
+
+    /* Faixas de Destaque por Coluna de Métrica */
+    div[data-testid="column"]:nth-of-type(1) div[data-testid="stMetric"] { border-top: 4px solid #0284C7 !important; }
+    div[data-testid="column"]:nth-of-type(2) div[data-testid="stMetric"] { border-top: 4px solid #F59E0B !important; }
+    div[data-testid="column"]:nth-of-type(3) div[data-testid="stMetric"] { border-top: 4px solid #EF4444 !important; }
+    div[data-testid="column"]:nth-of-type(4) div[data-testid="stMetric"] { border-top: 4px solid #10B981 !important; }
+    div[data-testid="column"]:nth-of-type(5) div[data-testid="stMetric"] { border-top: 4px solid #64748B !important; }
+
+    /* Abas de Navegação */
+    div[data-baseweb="tab-list"] {
+        gap: 8px;
+        border-bottom: 2px solid #334155;
+        padding-bottom: 2px;
+    }
+    button[data-baseweb="tab"] {
+        border-radius: 6px 6px 0 0 !important;
+        font-weight: 600 !important;
+        font-size: 0.95rem !important;
+        padding: 8px 16px !important;
+        color: #94A3B8 !important;
+        transition: all 0.2s ease;
+    }
+    button[data-baseweb="tab"][aria-selected="true"] {
+        color: #38BDF8 !important;
+    }
+
+    /* Botões de Ação */
+    button[kind="primary"] {
+        background: linear-gradient(135deg, #0284C7 0%, #0369A1 100%) !important;
+        border: none !important;
+        color: #FFFFFF !important;
+        font-weight: 600 !important;
+        border-radius: 8px !important;
+        box-shadow: 0 2px 4px rgba(2, 132, 199, 0.25) !important;
+        transition: all 0.2s ease !important;
+    }
+    button[kind="primary"]:hover {
+        box-shadow: 0 4px 12px rgba(2, 132, 199, 0.35) !important;
+        transform: translateY(-1px);
+    }
+    button[kind="secondary"] {
+        border-radius: 8px !important;
+        font-weight: 500 !important;
+        background: #1E293B !important;
+        border: 1px solid #334155 !important;
+        color: #F8FAFC !important;
+        transition: all 0.15s ease !important;
+    }
+
+    /* Cards e Containers em Dark Theme */
     .card-destaque {
-        background-color: #f8f9fa;
+        background-color: #1E293B;
         border-radius: 8px;
         padding: 16px;
-        border-left: 5px solid #0b4f6c;
+        border-left: 5px solid #0284C7;
+        color: #F8FAFC;
+    }
+    .card-clinico-resultado {
+        background: #1E293B;
+        border: 1px solid #334155;
+        border-radius: 10px;
+        padding: 16px 20px;
+        margin-bottom: 16px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        color: #F8FAFC;
+    }
+    .tag-prioridade-urgente {
+        display: inline-block;
+        background: #FEE2E2;
+        color: #991B1B;
+        font-weight: 700;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: 0.85rem;
+    }
+    .tag-prioridade-alta {
+        display: inline-block;
+        background: #FEF3C7;
+        color: #92400E;
+        font-weight: 700;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: 0.85rem;
+    }
+    .tag-prioridade-rotina {
+        display: inline-block;
+        background: #D1FAE5;
+        color: #065F46;
+        font-weight: 700;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: 0.85rem;
+    }
+
+    /* Rodapé Institucional */
+    .mediflow-footer {
+        margin-top: 40px;
+        padding: 20px 0 10px 0;
+        border-top: 1px solid #E2E8F0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 10px;
+        color: #64748B;
+        font-size: 0.82rem;
+    }
+
+    /* ========================================================================
+       MODERN HEALTH TECH / SHADCN UI SYSTEM
+       ======================================================================== */
+
+    /* Container do Formulário de Auditoria Clínica */
+    div[data-testid="stForm"] {
+        background: #1E293B !important;
+        border: 1px solid #334155 !important;
+        border-radius: 14px !important;
+        padding: 22px 24px !important;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3) !important;
+    }
+
+    /* Campos Desabilitados: Aparência Dark Integrada */
+    div[data-testid="stTextInput"] input:disabled {
+        background-color: #0F172A !important;
+        color: #F8FAFC !important;
+        -webkit-text-fill-color: #F8FAFC !important;
+        font-weight: 600 !important;
+        font-size: 0.92rem !important;
+        border: 1px solid #334155 !important;
+        border-radius: 8px !important;
+        padding: 10px 14px !important;
+    }
+
+    /* Campos Ativos (Input e Textarea) */
+    div[data-testid="stTextInput"] input:not(:disabled),
+    div[data-testid="stTextArea"] textarea {
+        background-color: #0F172A !important;
+        border: 1px solid #334155 !important;
+        border-radius: 8px !important;
+        font-size: 0.95rem !important;
+        color: #F8FAFC !important;
+        transition: all 0.2s ease !important;
+    }
+    div[data-testid="stTextInput"] input:not(:disabled):focus,
+    div[data-testid="stTextArea"] textarea:focus {
+        border-color: #38BDF8 !important;
+        box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2) !important;
+        outline: none !important;
+    }
+
+    /* Labels dos Campos */
+    label[data-testid="stWidgetLabel"] p {
+        font-size: 0.82rem !important;
+        font-weight: 600 !important;
+        color: #94A3B8 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.03em !important;
+        margin-bottom: 4px !important;
+    }
+
+    /* Radio Buttons estilo Segmented Control (Pills Modernos) */
+    div[data-testid="stRadio"] div[role="radiogroup"] {
+        display: flex !important;
+        gap: 8px !important;
+        background: #0F172A !important;
+        padding: 5px !important;
+        border-radius: 10px !important;
+        border: 1px solid #334155 !important;
+    }
+    div[data-testid="stRadio"] div[role="radiogroup"] label {
+        flex: 1 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        background: transparent !important;
+        border-radius: 8px !important;
+        padding: 8px 14px !important;
+        font-weight: 600 !important;
+        font-size: 0.88rem !important;
+        color: #94A3B8 !important;
+        transition: all 0.2s ease !important;
+        cursor: pointer !important;
+        border: 1px solid transparent !important;
+    }
+    div[data-testid="stRadio"] div[role="radiogroup"] label:hover {
+        background: #334155 !important;
+        color: #F8FAFC !important;
+    }
+    /* Oculta o marcador circular de rádio nativo */
+    div[data-testid="stRadio"] div[role="radiogroup"] label > div:first-child {
+        display: none !important;
+    }
+    div[data-testid="stRadio"] div[role="radiogroup"] label:has(input:checked) {
+        background: #1E293B !important;
+        color: #38BDF8 !important;
+        border: 1px solid #0284C7 !important;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3) !important;
+    }
+
+    /* Selectbox Moderno */
+    div[data-testid="stSelectbox"] > div {
+        border-radius: 8px !important;
+        border: 1px solid #334155 !important;
+        background-color: #0F172A !important;
+        color: #F8FAFC !important;
+    }
+
+    /* Alert / Warning estilo Banner Moderno */
+    div[data-testid="stAlert"] {
+        border-radius: 10px !important;
+        border: 1px solid #92400E !important;
+        background-color: rgba(69, 26, 3, 0.35) !important;
+        color: #FEF3C7 !important;
+        padding: 12px 16px !important;
+    }
+
+    /* Barra de Progresso com Gradiente */
+    div[data-testid="stProgress"] > div {
+        height: 10px !important;
+        border-radius: 9999px !important;
+        background-color: #334155 !important;
+    }
+    div[data-testid="stProgress"] > div > div {
+        border-radius: 9999px !important;
+        background: linear-gradient(90deg, #EF4444 0%, #F59E0B 50%, #10B981 100%) !important;
+    }
+
+    /* Card Dossiê da Auditoria (Coluna Esquerda) */
+    .card-dossie-auditoria {
+        background: #FFFFFF;
+        border: 1px solid #E2E8F0;
+        border-radius: 14px;
+        padding: 22px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
     }
 </style>
 """, unsafe_allow_html=True)
@@ -146,8 +462,18 @@ def tipo_pela_extensao(nome_arquivo: str) -> str:
 # CABEÇALHO E CONTADORES (preenchidos no fim do script, depois de enviar ou decidir)
 # ============================================================================
 
-st.markdown('<div class="titulo-principal">🏥 MediFlow — Triagem e Auditoria Clínica</div>', unsafe_allow_html=True)
-st.markdown('<div class="subtitulo">Agente Autônomo para Triagem, Extração e Roteamento de Documentos Clínicos | OCI Always Free</div>', unsafe_allow_html=True)
+st.markdown("""
+<div class="header-container">
+    <div>
+        <div class="titulo-principal">MediFlow — Triagem e Auditoria Clínica</div>
+        <div class="subtitulo">Agente Autônomo para Triagem, Extração e Roteamento de Documentos Clínicos | OCI Always Free</div>
+    </div>
+    <div class="status-badges">
+        <span class="badge-oci"><span class="pulse-dot"></span> VM OCI Always Free Ativa</span>
+        <span class="badge-ia">⚡ Gemini 3.5 Flash-Lite</span>
+    </div>
+</div>
+""", unsafe_allow_html=True)
 
 # O Streamlit desenha na ordem do script. Os contadores ficam no topo da tela mas são preenchidos
 # no fim, depois de uma triagem enviada ou de uma decisão registrada nesta mesma execução.
@@ -161,9 +487,9 @@ st.divider()
 # ============================================================================
 
 tab_auditoria, tab_envio, tab_historico = st.tabs([
-    "🔍 Fila de Auditoria Clínica (Human-in-the-Loop)",
-    "📤 Envio e Triagem de Documentos",
-    "📊 Histórico & Buckets OCI"
+    "Fila de Auditoria Clínica (Human-in-the-Loop)",
+    "Envio e Triagem de Documentos",
+    "Histórico & Buckets OCI"
 ])
 
 
@@ -172,7 +498,7 @@ tab_auditoria, tab_envio, tab_historico = st.tabs([
 # Vem primeiro no código para o envio limpar o cache antes de a fila e o histórico serem lidos.
 # ----------------------------------------------------------------------------
 with tab_envio:
-    st.subheader("📤 Enviar Documento para Triagem")
+    st.subheader("Enviar Documento para Triagem")
     st.caption("Envie o texto de um documento ou um PDF/imagem. Use apenas dados fictícios ou anonimizados.")
 
     modo_envio = st.radio(
@@ -238,6 +564,72 @@ with tab_envio:
             else:
                 st.success("✅ Triagem processada com sucesso via API FastAPI + Grafo LangGraph!")
                 recarregar_dados()  # a fila, o histórico e os contadores passam a incluir este documento
+
+                classif = resultado.get("classificacao") or {}
+                roteamento = resultado.get("decisao_roteamento") or {}
+                dados = resultado.get("dados_extraidos") or {}
+                pac = dados.get("paciente") or {}
+                med = dados.get("medico_solicitante") or {}
+
+                prioridade = classif.get("nivel_prioridade", "N/A")
+                score = classif.get("score_confianca_classificacao", 0.0)
+                destino = roteamento.get("destino_principal", "N/A")
+                bucket = (resultado.get("armazenamento_oci") or {}).get("bucket", "N/A")
+
+                # Escapa todos os valores dinâmicos antes de inseri-los no HTML.
+                documento_id_html = html.escape(str(resultado.get("documento_id", "")))
+                prioridade_html = html.escape(str(prioridade))
+                tipo_html = html.escape(str(classif.get("tipo_documento", "N/A")))
+                destino_html = html.escape(str(destino))
+                bucket_html = html.escape(str(bucket))
+                nome_html = html.escape(str(pac.get("nome") or "Não identificado"))
+                idade_html = html.escape(str(pac.get("idade") or "-"))
+                cid_html = html.escape(str(dados.get("cid_sugerido") or "N/A"))
+                medico_html = html.escape(str(med.get("nome") or "Não identificado"))
+                crm_html = html.escape(str(med.get("crm") or "N/A"))
+
+                tag_classe = (
+                    "tag-prioridade-urgente" if "URG" in str(prioridade).upper() or "EMERG" in str(destino).upper()
+                    else ("tag-prioridade-alta" if "ALTA" in str(prioridade).upper() else "tag-prioridade-rotina")
+                )
+
+                st.markdown(
+                    f"""
+                    <div class="card-clinico-resultado">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+                            <div style="font-weight: 700; font-size: 1.05rem; color: #0F172A;">
+                                📄 Resumo Clínico da Triagem — <code>{documento_id_html}</code>
+                            </div>
+                            <div>
+                                <span class="{tag_classe}">{prioridade_html}</span>
+                            </div>
+                        </div>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; font-size: 0.88rem;">
+                            <div>
+                                <div style="color: #64748B; font-size: 0.75rem; text-transform: uppercase; font-weight: 600;">Tipo do Documento</div>
+                                <div style="font-weight: 600; color: #1E293B;">{tipo_html}</div>
+                                <div style="color: #64748B; font-size: 0.75rem; margin-top: 2px;">Confiança: <b>{score * 100:.1f}%</b></div>
+                            </div>
+                            <div>
+                                <div style="color: #64748B; font-size: 0.75rem; text-transform: uppercase; font-weight: 600;">Destino & OCI</div>
+                                <div style="font-weight: 600; color: #0284C7;">{destino_html}</div>
+                                <div style="color: #64748B; font-size: 0.75rem; margin-top: 2px;">Bucket: <code>{bucket_html}</code></div>
+                            </div>
+                            <div>
+                                <div style="color: #64748B; font-size: 0.75rem; text-transform: uppercase; font-weight: 600;">Paciente</div>
+                                <div style="font-weight: 600; color: #1E293B;">{nome_html} ({idade_html} anos)</div>
+                                <div style="color: #64748B; font-size: 0.75rem; margin-top: 2px;">CID: <b>{cid_html}</b></div>
+                            </div>
+                            <div>
+                                <div style="color: #64748B; font-size: 0.75rem; text-transform: uppercase; font-weight: 600;">Médico Solicitante</div>
+                                <div style="font-weight: 600; color: #1E293B;">{medico_html}</div>
+                                <div style="color: #64748B; font-size: 0.75rem; margin-top: 2px;">CRM: <b>{crm_html}</b></div>
+                            </div>
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
 
                 st.markdown("### Resultado da Triagem:")
                 col_r1, col_r2 = st.columns(2)
@@ -305,7 +697,7 @@ with tab_auditoria:
         st.success("🎉 Não há documentos pendentes na fila de auditoria humana no momento!")
         st.info("Todos os laudos e receitas com alta confiabilidade foram triados e roteados automaticamente.")
     else:
-        st.subheader(f"📋 Documentos Retidos para Revisão ({len(pendentes)})")
+        st.subheader(f"Documentos Retidos para Revisão ({len(pendentes)})")
         por_id = {p["documento_id"]: p for p in pendentes}
         documento_id = st.selectbox(
             "Selecione o caso para auditar:",
@@ -322,7 +714,7 @@ with tab_auditoria:
 
         # Coluna da esquerda: o que o sistema decidiu e o motivo da retenção
         with col_esq:
-            st.markdown("### 📄 Documento Retido")
+            st.markdown("### Documento Retido")
             st.markdown(f"**ID do Documento:** `{doc['documento_id']}`")
             st.markdown(f"**Tipo:** {doc['tipo_documento']}")
             st.markdown(f"**Prioridade:** {doc['nivel_prioridade']}")
@@ -336,7 +728,7 @@ with tab_auditoria:
 
         # Coluna da direita: dados extraídos (somente leitura) e a decisão de quem revisa
         with col_dir:
-            st.markdown("### ✍️ Formulário de Revisão Clínica")
+            st.markdown("### Formulário de Revisão Clínica")
 
             with st.form(key=f"form_auditoria_{documento_id}"):
                 st.caption("Dados extraídos pela IA, como a API os devolveu.")
@@ -384,6 +776,16 @@ with tab_historico:
     st.subheader("📦 Histórico dos Documentos no Armazenamento")
     st.caption("Organização segregada de arquivos conforme exigido pelo edital Always Free da Oracle.")
 
+    st.markdown("""
+    <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px;">
+        <span style="background: #F1F5F9; border: 1px solid #CBD5E1; padding: 4px 8px; border-radius: 6px; font-size: 0.78rem; color: #334155;">📥 <code>mediflow-recebidos</code> (Ingestão)</span>
+        <span style="background: #ECFDF5; border: 1px solid #A7F3D0; padding: 4px 8px; border-radius: 6px; font-size: 0.78rem; color: #065F46;">✅ <code>mediflow-rotina</code> (Farmácia / PEP / Autorizações)</span>
+        <span style="background: #FEF2F2; border: 1px solid #FECACA; padding: 4px 8px; border-radius: 6px; font-size: 0.78rem; color: #991B1B;">🚨 <code>mediflow-urgentes</code> (Emergência)</span>
+        <span style="background: #FFFBEB; border: 1px solid #FDE68A; padding: 4px 8px; border-radius: 6px; font-size: 0.78rem; color: #92400E;">🔍 <code>mediflow-auditoria-humana</code> (Revisão Humana)</span>
+        <span style="background: #F8FAFC; border: 1px solid #E2E8F0; padding: 4px 8px; border-radius: 6px; font-size: 0.78rem; color: #475569;">🚫 <code>mediflow-rejeitados</code> (Falhas / Rejeição)</span>
+    </div>
+    """, unsafe_allow_html=True)
+
     historico, erro_do_historico = ler(carregar_historico)
     if erro_do_historico:
         mostrar_erro(erro_do_historico)
@@ -429,3 +831,14 @@ with area_dos_contadores:
             st.metric(label="✅ Rotina", value=sum(1 for h in historico if h["destino_principal"] in DESTINOS_DE_ROTINA))
         with col_m5:
             st.metric(label="🚫 Rejeitados", value=sum(1 for h in historico if h["status"] == "rejeitado"))
+
+st.markdown("""
+<div class="mediflow-footer">
+    <div>
+        <strong>🏥 MediFlow</strong> · Sistema Autônomo de Roteamento Clínico · <em>Hackathon ONE G10</em>
+    </div>
+    <div>
+        <strong>Equipe:</strong> André · Ingrid · Guilherme · Lethicia | <strong>Infra:</strong> OCI VM Always Free & Object Storage
+    </div>
+</div>
+""", unsafe_allow_html=True)

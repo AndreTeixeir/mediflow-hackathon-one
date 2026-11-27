@@ -3,9 +3,9 @@
 > **Projeto:** Projeto 2 – 🏥 MediFlow – Agente Autônomo para Triagem, Extração e Roteamento de Documentos Clínicos  
 > **Hackathon:** ONE G10 (Oracle Next Education & Alura)  
 > **Repositório:** `No-Country-simulation/g10-Brasil27`  
-> **Branch de Trabalho:** `feature/agente-deploy-ingrid` (PR #2 – Aprovado e pronto para merge na `main`)  
-> **Responsável:** Ingrid Soares — *Grafo de IA (LangGraph), Visão Multimodal / OCR, Segurança, Redes & Deploy OCI*  
-> **Última Atualização:** 28/10/2026
+> **Branch de Trabalho:** `feature/agente-deploy-ingrid` (PR #2 – Mergeado na `main`), `docs/ajustes-readme-slides-demoday` (PR #8 – Mergeado) e `feature/melhorias-visual-frontend` (PR #9 – Mergeado)  
+> **Responsável:** Ingrid Soares — *Grafo de IA (LangGraph), Visão Multimodal / OCR, Frontend React / Streamlit, Segurança, Redes & Deploy OCI*  
+> **Última Atualização:** 15/11/2026
 
 ---
 
@@ -39,8 +39,13 @@ Implementação do motor de orquestração autônomo com **LangGraph (`StateGrap
 - **`deploy/nginx_mediflow.conf`** e **`deploy/setup_oci_vm.sh`**: Reverse Proxy Nginx na porta `80`/`443` com *rate-limiting* (`10r/s`) e firewall UFW liberando apenas `22/tcp`, `80/tcp` e `443/tcp` para proteger a conta OCI.
 
 ### 1.5. Code Reviews e Integração Realizados pela Ingrid
-- **PR #1 (`feature/contratos-lethicia` — Leticia):** Revisado, testado com o Grafo e aprovado/mergeado na `main` (`1f742e5`).
+- **PR #1 (`feature/contratos-lethicia` — Lethicia):** Revisado, testado com o Grafo e aprovado/mergeado na `main` (`1f742e5`).
 - **PR #3 (`feat/api-triagem` — André):** Revisado, validado com os 90 testes automatizados e aprovado/mergeado na `main` (`89c13a4`).
+
+### 1.6. Frontend Moderno em React e Aprimoramento de UX/UI
+- **Frontend React (`frontend/`):** Aplicação moderna construída com React 18, Vite, Tailwind CSS e Lucide React, com tema dark refinado e integração completa com a API REST.
+- **Modernização do Streamlit (`interface/app.py`):** Cards clínicos de triagem, segmented controls na auditoria e métricas visuais no painel principal.
+- **Apresentação e Slides do DemoDay (`docs/`):** Atualização dos papéis reais da equipe no pitch, diagramas OCI e regeneração do slide oficial em alta resolução (`docs/Img_slide.png`).
 
 ---
 
@@ -66,12 +71,13 @@ Implementação do motor de orquestração autônomo com **LangGraph (`StateGrap
 ## 🔄 3. Checklist de Progresso e Próximos Passos
 
 - [x] Sincronização do repositório `g10-Brasil27`.
-- [x] Code Review e Merge do **PR #1** da Leticia (`contratos/` e `regras/`).
+- [x] Code Review e Merge do **PR #1** da Lethicia (`contratos/` e `regras/`).
 - [x] Implementação do Grafo LangGraph (`agente/grafo.py`), Leitura/Visão Multimodal (`agente/leitor_documentos.py`, `agente/visao_multimodal.py`), Prompts (`prompts/`) e Testes (`tests/test_agente.py`).
 - [x] Implementação da infraestrutura Docker, Nginx e script de firewall OCI (`deploy/`).
 - [x] Resolução de todos os pontos de integração da Fase 1 atribuídos à Ingrid (`E1`, `E5`, `E6`, `E7`, `E8`).
 - [x] Code Review e Merge do **PR #3** do André (`api/` e `armazenamento/`).
 - [x] **Merge do PR #2 (`feature/agente-deploy-ingrid`) na `main` (`d67e823`):** Grafo LangGraph, Visão Multimodal, Prompts e Deploy integrados na branch principal.
 - [x] **Integração API $\leftrightarrow$ Grafo (Item E7):** `api/triagem.py` conectado ao grafo real (`executar_triagem_mediflow` / `analisar_documento` do pacote `agente`), `.env.example` documentado com Google Gemini (`gemini-2.5-flash`) e 90/90 testes automatizados passando.
+- [x] **Evolução Fase 2 (Estado Atual):** Atualização para Google Gemini (`gemini-3.5-flash-lite`) devido a restrições de disponibilidade do 2.5 em contas novas, integração da auditoria humana pela API e 710/710 testes automatizados passando.
 - [x] **Code Review, Merge e Integração da Interface Streamlit (PR #4 — `interface/app.py`):** Integrada na `main` com suporte a `MEDIFLOW_API_URL` (local/Docker), upload multimodal (`PDF`/`PNG`/`JPG` em Base64) e conexão direta com a API e o Grafo LangGraph.
-- [ ] **Próximo Passo Final (Deploy em Nuvem OCI):** Subir a aplicação integrada na VM da OCI Always Free utilizando `deploy/setup_oci_vm.sh` e `deploy/docker-compose.yml`.
+- [x] **Deploy na OCI Concluído:** Deploy na OCI concluído em 11/11/2026 pelo André, usando o Dockerfile e o docker-compose.yml desta parte do projeto (produção ativa em `http://137.131.182.189/`).

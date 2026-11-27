@@ -63,8 +63,8 @@ Se o Python 3.13 não aparecer, instale antes de continuar:
 **Quem ainda não tem o projeto:**
 
 ```bash
-git clone https://github.com/No-Country-simulation/g10-Brasil27.git
-cd g10-Brasil27
+git clone https://github.com/AndreTeixeir/mediflow-hackathon-one.git
+cd mediflow-hackathon-one
 ```
 
 **Quem já tem o projeto clonado:** entre na pasta e traga a versão atual da `main`:
@@ -74,7 +74,7 @@ git checkout main
 git pull
 ```
 
-Os comandos de Git são iguais no Windows e no Linux. Todos os comandos daqui em diante são rodados **na pasta raiz do projeto** (`g10-Brasil27`).
+Os comandos de Git são iguais no Windows e no Linux. Todos os comandos daqui em diante são rodados **na pasta raiz do projeto** (`mediflow-hackathon-one`).
 
 ## Passo 3 — Criar e ativar o ambiente virtual (`.venv`)
 
@@ -226,10 +226,10 @@ A pasta `dados_teste` tem três cenários fictícios. Em cada `exemplo.json`, o 
 
 No painel:
 
-1. Aba **"📤 Envio e Triagem de Documentos"**: escolha **"Texto do documento"**, cole o texto de um dos exemplos e clique em **"🚀 Processar Triagem Automática"**. Também é possível escolher **"Enviar arquivo PDF ou imagem"** (até 10 MB).
+1. Aba **"Envio e Triagem de Documentos"**: escolha **"Texto do documento"**, cole o texto de um dos exemplos e clique em **"🚀 Processar Triagem Automática"**. Também é possível escolher **"Enviar arquivo PDF ou imagem"** (até 10 MB).
 2. Cada envio precisa de um **ID diferente**. O mesmo ID de novo dá erro 409. Use o botão **"Gerar novo ID"** a cada envio.
-3. Aba **"🔍 Fila de Auditoria Clínica (Human-in-the-Loop)"**: o documento retido aparece aqui. Escolha o destino (**Rotina**, **Urgente** ou **Rejeitar**), escreva o seu nome e a justificativa (de 5 a 500 caracteres) e clique em **"✅ Registrar decisão"**.
-4. Aba **"📊 Histórico & Buckets OCI"**: mostra os documentos processados. Apesar do nome da aba, no modo `local` tudo fica gravado na pasta **`armazenamento_local/`** do projeto, que também não vai para o Git.
+3. Aba **"Fila de Auditoria Clínica (Human-in-the-Loop)"**: o documento retido aparece aqui. Escolha o destino (**Rotina**, **Urgente** ou **Rejeitar**), escreva o seu nome e a justificativa (de 5 a 500 caracteres) e clique em **"✅ Registrar decisão"**.
+4. Aba **"Histórico & Buckets OCI"**: mostra os documentos processados. Apesar do nome da aba, no modo `local` tudo fica gravado na pasta **`armazenamento_local/`** do projeto, que também não vai para o Git.
 
 **Use somente dados fictícios.** Nunca envie documentos de pacientes reais.
 
@@ -370,7 +370,7 @@ A resposta traz `decisao_roteamento.destino_principal = "Fila_Emergencia_Medica"
 ### Estrutura do repositório
 
 ```text
-g10-Brasil27/
+mediflow-hackathon-one/
 ├── contratos/       # Modelos Pydantic de entrada e saída (contrato de dados)
 ├── regras/          # Regras de consistência, score de confiança e critérios de urgência
 ├── agente/          # Grafo de decisão (LangGraph) e leitura de documentos (texto / PDF / imagem)

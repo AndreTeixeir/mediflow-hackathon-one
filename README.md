@@ -8,7 +8,9 @@ Projeto do **Hackathon ONE G10** (Oracle Next Education e Alura).
 
 Repositório oficial da equipe: [No-Country-simulation/g10-Brasil27](https://github.com/No-Country-simulation/g10-Brasil27).
 
-[![Testes](https://github.com/No-Country-simulation/g10-Brasil27/actions/workflows/testes.yml/badge.svg)](https://github.com/No-Country-simulation/g10-Brasil27/actions/workflows/testes.yml)
+Neste repositório, as pastas `api/`, `agente/`, `regras/`, `contratos/`, `armazenamento/`, `prompts/` e `tests/` são iguais às do repositório da equipe, e o painel é o da equipe, trazido dos PRs #9 e #10. A aplicação em `frontend/` e os arquivos da apresentação do DemoDay estão só no repositório da equipe, e os guias [`docs/rodar-localmente.md`](docs/rodar-localmente.md), [`docs/deploy-oci.md`](docs/deploy-oci.md), [`docs/decisoes-tecnicas.md`](docs/decisoes-tecnicas.md) e [`docs/historico.md`](docs/historico.md), só aqui.
+
+[![Testes](https://github.com/AndreTeixeir/mediflow-hackathon-one/actions/workflows/testes.yml/badge.svg)](https://github.com/AndreTeixeir/mediflow-hackathon-one/actions/workflows/testes.yml)
 [![Python 3.13](https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white)](requirements.txt)
 [![Deploy: OCI Always Free](https://img.shields.io/badge/Deploy-OCI%20Always%20Free-C74634?logo=oracle&logoColor=white)](docs/deploy-oci.md)
 
@@ -19,6 +21,8 @@ Repositório oficial da equipe: [No-Country-simulation/g10-Brasil27](https://git
 **No ar: http://137.131.182.189**
 
 Ambiente de demonstração do hackathon, em HTTP, somente com dados fictícios e tetos diários (100 documentos e 300 MB por dia). Não envie documentos de pacientes reais.
+
+As telas do painel entraram no repositório em 12/11/2026 (`f59f855`) e mostram o visual anterior às mudanças dos PRs #9 e #10.
 
 ![Painel: resultado da triagem do cenário de urgência, que vai para a fila de emergência médica](docs/imagens/painel-02-envio-urgencia.png)
 
@@ -47,7 +51,7 @@ O MediFlow automatiza essa triagem: lê o documento (inclusive PDF escaneado e i
 - Gera um **alerta ao plantão** para a urgência crítica (no JSON de saída).
 - **Fila de auditoria humana:** quem revisa escolhe `rotina`, `urgente` ou `rejeitado`, com nome e justificativa. A trilha guarda também o que o grafo tinha decidido.
 - **Histórico e contadores** no painel, lidos da API.
-- **Armazenamento segregado** em cinco buckets privados, um por status.
+- **Armazenamento segregado** em cinco buckets privados: um guarda a entrada de cada documento, e o resultado vai para o bucket do destino (rotina, urgentes, auditoria humana ou rejeitados).
 - **API protegida:** chave de acesso, corpo de até 15 MB, tetos diários e cache das listagens.
 - **Deploy** em Docker Compose, atrás de nginx, numa VM ARM da OCI Always Free.
 
@@ -59,12 +63,12 @@ O MediFlow automatiza essa triagem: lê o documento (inclusive PDF escaneado e i
 | Classificação com LLM | `agente/visao_multimodal.py` (Gemini com saída estruturada) e `prompts/`. A resposta traz `tipo_documento`, `especialidade` e `nivel_prioridade` ([telas](#os-3-cenários)) |
 | Extração em JSON | Contratos Pydantic em `contratos/modelos.py` (`TriagemResposta` e `DadosExtraidos`). Veja o [exemplo de saída](#exemplo-do-json-de-saída) |
 | Lógica condicional | `regras/regras_clinicas.py` (regras de roteamento) e a aresta condicional do grafo em `agente/grafo.py`. Veja o [fluxo de decisão](#fluxo-de-decisão) |
-| Object Storage com buckets segregados | Cinco buckets privados, um por status (`armazenamento/repositorio.py`, `api/triagem.py`). Telas [`oci-02`](docs/imagens/oci-02-buckets.png) e [`oci-03`](docs/imagens/oci-03-objetos-rotina.png) |
+| Object Storage com buckets segregados | Cinco buckets privados: o de entrada, que recebe cada documento, e quatro escolhidos pelo destino, que são rotina, urgentes, auditoria humana e rejeitados (`armazenamento/repositorio.py`, `api/triagem.py`). Telas [`oci-02`](docs/imagens/oci-02-buckets.png) e [`oci-03`](docs/imagens/oci-03-objetos-rotina.png) |
 | Os 3 cenários | `dados_teste/` e as telas do site no ar, na seção [Os 3 cenários](#os-3-cenários) |
 | Diagrama do fluxo | Seção [Fluxo de decisão](#fluxo-de-decisão) |
 | Arquitetura | Seção [Arquitetura](#arquitetura) |
 | Instruções de execução | Seção [Como rodar](#como-rodar) e [`docs/rodar-localmente.md`](docs/rodar-localmente.md) |
-| Commits documentados | 50 dos 51 commits da `main` (sem contar os merges) seguem `tipo(escopo): descrição`; a exceção é um upload pelo GitHub (`ef31d47`). A [linha do tempo](docs/historico.md) cita os PRs #1 a #8 e os commits principais |
+| Commits documentados | Os commits da `main` (sem contar os merges) seguem `tipo(escopo): descrição`, com uma exceção: um upload pelo GitHub (`ef31d47`). A [linha do tempo](docs/historico.md) cita os PRs #1 a #10 e os commits principais |
 | Diferencial: deploy em OCI Compute | Site no ar numa VM `VM.Standard.A1.Flex`. Guia em [`docs/deploy-oci.md`](docs/deploy-oci.md) e telas [`oci-00`](docs/imagens/oci-00-shape-always-free.png) e [`oci-01`](docs/imagens/oci-01-instancia.png) |
 | Diferencial: painel Human-in-the-Loop | Aba "Fila de Auditoria Clínica" em `interface/app.py` e endpoints `/api/v1/auditoria/...` em `api/auditoria.py`. Telas [`painel-04`](docs/imagens/painel-04-fila-auditoria.png) a [`painel-06`](docs/imagens/painel-06-historico.png) |
 | Diferencial: OCR e visão multimodal | O Gemini lê PDF escaneado e imagem: `agente/visao_multimodal.py` envia os bytes do arquivo ao modelo com o prompt `PROMPT_OCR_MULTIMODAL`. Não há um motor de OCR separado: o OCR é feito pelo próprio Gemini. O código registra que o modelo foi testado com texto, PNG e PDF escaneado, e a ingestão que prepara a imagem e o PDF digitalizado para essa leitura é testada em `tests/test_agente.py`. **Não há teste automatizado que envie um arquivo real ao Gemini** |
@@ -72,6 +76,8 @@ O MediFlow automatiza essa triagem: lê o documento (inclusive PDF escaneado e i
 ## Os 3 cenários
 
 Os três cenários de `dados_teste/` foram enviados ao site no ar pelo painel, um por vez. **Os três destinos coincidem com o `resposta_esperada` de cada `exemplo.json`.** Valores como o score variam com o modelo (por exemplo, `1` no resultado real contra `0,98` no gabarito do cenário 1).
+
+As telas desta seção também entraram no repositório em 12/11/2026 (`f59f855`) e mostram o visual anterior às mudanças dos PRs #9 e #10.
 
 | # | Entrada (resumo) | Destino | Bucket | Tela |
 |---|---|---|---|---|
@@ -93,7 +99,7 @@ Os buckets dos cenários 1 e 2 estão no [histórico](docs/imagens/painel-06-his
 
 ## Exemplo do JSON de saída
 
-Resposta real da triagem do cenário de urgência (`DOC-PORTFOLIO-URGENCIA-001`), como o painel a mostra. O paciente é fictício. A API devolve ainda `status`, `documento_id` e `armazenamento_oci` (o bucket e o caminho do objeto), que o painel não exibe.
+Resposta real da triagem do cenário de urgência (`DOC-PORTFOLIO-URGENCIA-001`), como o painel a mostra. O paciente é fictício. A API devolve ainda `status`, `documento_id` e `armazenamento_oci` (o bucket e o caminho do objeto). Desses, o painel mostra só o `documento_id` e o bucket, no resumo clínico que aparece acima do JSON.
 
 ```json
 {
@@ -175,7 +181,7 @@ O MediFlow roda numa VM `VM.Standard.A1.Flex` (Ampere, 1 OCPU e 5 GB, Ubuntu 24.
 
 ![A instância mediflow em execução](docs/imagens/oci-01-instancia.png)
 
-Os documentos vão para **cinco buckets privados**, um por status, e cada documento vira um objeto JSON no bucket do seu destino:
+Os documentos vão para **cinco buckets privados**: a entrada de cada um fica em `mediflow-recebidos`, e o resultado vira um objeto JSON no bucket do seu destino (`mediflow-rotina`, `mediflow-urgentes`, `mediflow-auditoria-humana` ou `mediflow-rejeitados`):
 
 ![Os cinco buckets mediflow-*, todos privados](docs/imagens/oci-02-buckets.png)
 
@@ -221,8 +227,8 @@ O passo a passo completo, com o porquê de cada cuidado, está em [`docs/deploy-
 O guia completo, com os comandos do Windows (PowerShell) e do Linux, está em [`docs/rodar-localmente.md`](docs/rodar-localmente.md). Em resumo, com o Python 3.13 e o Git:
 
 ```bash
-git clone https://github.com/No-Country-simulation/g10-Brasil27.git
-cd g10-Brasil27
+git clone https://github.com/AndreTeixeir/mediflow-hackathon-one.git
+cd mediflow-hackathon-one
 python3.13 -m venv .venv && source .venv/bin/activate     # Windows: py -3.13 -m venv .venv
 pip install -r requirements.txt
 cp .env.example .env                                      # Windows: Copy-Item .env.example .env
@@ -261,13 +267,13 @@ Os testes rodam no **CI** (GitHub Actions, `.github/workflows/testes.yml`) em to
 | Nome | GitHub | Área | O que fez, como e onde |
 |---|---|---|---|
 | Lethicia Almeida | [@Lethicia-almzd](https://github.com/Lethicia-almzd) | Contratos de dados, regras clínicas e painel | **Contratos de dados** em Pydantic (`contratos/modelos.py`, `92f37ec`). **Regras clínicas:** validação do CRM, score de confiança, critérios de urgência e roteamento (`regras/regras_clinicas.py`, `92f37ec`). **Cenários de teste** (`dados_teste/`, `92f37ec`). **Painel de auditoria e tela de triagem** em Streamlit (`interface/app.py`, `7a3c54b`). PRs #1 e #4 |
-| Ingrid Soares | [@ingrdsoares](https://github.com/ingrdsoares) | Agente de IA, prompts e infraestrutura | **Grafo LangGraph** (`agente/grafo.py`, `b70edb6`), **leitura multimodal** (`agente/leitor_documentos.py` e `agente/visao_multimodal.py`, `8196fc5`) e **prompts** (`prompts/`, `b125a02`, `997aa2d`). **Infraestrutura:** `Dockerfile` e compose (`4047ef4`), nginx e script de setup (`fed7b8a`). **Integração:** API ligada ao grafo (`db47d5e`) e painel ligado à API e ao grafo (`f9f082d`). **Correção do schema do Gemini** (`9e385f4`, `78176dc`). PRs #2, #5 e #6 |
+| Ingrid Soares | [@ingrdsoares](https://github.com/ingrdsoares) | Agente de IA, prompts, infraestrutura e visual do painel | **Grafo LangGraph** (`agente/grafo.py`, `b70edb6`), **leitura multimodal** (`agente/leitor_documentos.py` e `agente/visao_multimodal.py`, `8196fc5`) e **prompts** (`prompts/`, `b125a02`, `997aa2d`). **Infraestrutura:** `Dockerfile` e compose (`4047ef4`), nginx e script de setup (`fed7b8a`). **Integração:** API ligada ao grafo (`db47d5e`) e painel ligado à API e ao grafo (`f9f082d`). **Correção do schema do Gemini** (`9e385f4`, `78176dc`). **Versão visual atual do painel** (`interface/app.py`): cabeçalho, contadores em cartões, resumo clínico da triagem e formulário de auditoria redesenhado, nos PRs #9 e #10 do repositório da equipe. PRs #2, #5, #6, #8, #9 e #10 |
 | Guilherme Araujo Silva | [@Guilherme-Araujo-silva](https://github.com/Guilherme-Araujo-silva) | Tela de envio de documentos | **Tela inicial de envio** (`app.py`, `api_client.py`, `schemas.py` e `EXEMPLOS_DEMO.md`, `6be4317`, na branch `feature/documentos-guilherme`, fora da `main`) e **página de envio de arquivos** (`1_Envio_de_Arquivos.py`, `ef31d47`). A lógica de envio dele foi integrada à aba de envio do painel, com ele como coautor (`2a1ce95`) |
 | André Teixeira | [@AndreTeixeir](https://github.com/AndreTeixeir) | API, armazenamento, integração e deploy | **Estrutura inicial do repositório** (`64ff7eb`). **API FastAPI e armazenamento OCI/local** (`api/` e `armazenamento/`, `edf65c8`). **Integrações** da fase 1 (branch `integracao/fase-1`) e da fase 2 (`integracao/fase-2`, PR #7). **Chave de acesso, limite de 15 MB e tetos diários** (`api/seguranca.py`, `8e6e845`, `d7b0e42`, `fe5c765`). **API de auditoria, cache e cliente do painel** (`api/auditoria.py`, `api/cache_listagens.py` e `interface/cliente_api.py`, `f3ade5f`, `743db9c`, `97fcb09`). **Fila de auditoria pela API** (`97fcb09`). **Deploy na OCI:** VM, IAM, buckets, ciclo de vida e nginx ([`docs/deploy-oci.md`](docs/deploy-oci.md)). PRs #3 e #7 |
 
 **Como a autoria é contada.** Vale o **autor do commit** no Git, mais a coautoria pelo `Co-authored-by`. A tag `[Nome]` no fim de algumas mensagens indica a **área** do projeto, não quem escreveu: vários commits do André têm `[Lethicia]`, `[Ingrid]` ou `[Guilherme]` porque mexem na parte dessas pessoas. Por exemplo, as correções nas regras de CRM e de urgência (`c861c9f` e `6e4946e`) são do André, na área da Lethicia.
 
-**Sobre a interface.** O **painel** é da Lethicia (`7a3c54b`). A **ligação do painel com a API e com o grafo** é da Ingrid (`f9f082d`). A **lógica de envio** é do Guilherme, com coautoria no `2a1ce95`. A **integração** e a **fila de auditoria pela API** são do André (`97fcb09`).
+**Sobre a interface.** O **painel** nasceu com a Lethicia (`7a3c54b`), e a **versão visual atual** é da Ingrid, dos PRs #9 e #10 do repositório da equipe. A **ligação do painel com a API e com o grafo** é da Ingrid (`f9f082d`). A **lógica de envio** é do Guilherme, com coautoria no `2a1ce95`. A **integração** e a **fila de auditoria pela API** são do André (`97fcb09`).
 
 ## Limitações e próximos passos
 

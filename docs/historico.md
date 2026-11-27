@@ -18,7 +18,9 @@ Linha do tempo do MediFlow, do primeiro commit ao deploy na OCI. As datas dos co
 | #5 | Integração da API com o grafo e da interface Streamlit, ajuste do deploy | Ingrid | Mesclado: `347a51c`, em 07/11/2026 | [PR #5](https://github.com/No-Country-simulation/g10-Brasil27/pull/5) |
 | #6 | Compatibilidade do schema estruturado com o SDK `google-genai` e logging | Ingrid | Mesclado: `f3b2da3`, em 10/11/2026 | [PR #6](https://github.com/No-Country-simulation/g10-Brasil27/pull/6) |
 | #7 | Fase 2: app completo e pronto para o deploy (envio, auditoria humana pela API, chave de acesso) | André | Mesclado: `1232ec5`, em 10/11/2026 | [PR #7](https://github.com/No-Country-simulation/g10-Brasil27/pull/7) |
-| #8 | Ajustes de documentação e slides e roteiro do DemoDay | Ingrid | **Aberto**, com mudanças solicitadas na revisão (12/11/2026, UTC). **Não entra** na `main` | [PR #8](https://github.com/No-Country-simulation/g10-Brasil27/pull/8) |
+| #8 | Ajustes de documentação e slides e roteiro do DemoDay (deste PR, só as duas atualizações de `docs/relatorio_ingrid.md` foram trazidas para este repositório; os slides e o roteiro do pitch ficam só no repositório da equipe) | Ingrid | Mesclado no repositório da equipe: `0093ae2`, em 13/11/2026 | [PR #8](https://github.com/No-Country-simulation/g10-Brasil27/pull/8) |
+| #9 | Visual do painel Streamlit: cartões, resumo clínico da triagem e contadores (e uma aplicação React em `frontend/`, que fica só no repositório da equipe) | Ingrid | Mesclado no repositório da equipe: `29d6607`, em 13/11/2026 | [PR #9](https://github.com/No-Country-simulation/g10-Brasil27/pull/9) |
+| #10 | Score de confiança e HTML protegido no resumo clínico do painel, e uma atualização do relatório técnico da Ingrid (o PR também muda a aplicação React em `frontend/`, os slides e o README do repositório da equipe, que não vêm para cá) | Ingrid | Mesclado no repositório da equipe: `3e1f270`, em 16/11/2026 | [PR #10](https://github.com/No-Country-simulation/g10-Brasil27/pull/10) |
 
 ## Linha do tempo
 
@@ -86,4 +88,11 @@ O passo a passo está em [`deploy-oci.md`](deploy-oci.md).
 
 O Cost Analysis registra custo de R$ 0,00 de 14/10 a 12/11/2026 ([`oci-04`](imagens/oci-04-custo-zero.png)).
 
-Nesse dia, o PR #8 (slides e roteiro do DemoDay) é aberto e recebe um pedido de mudanças na revisão.
+Nesse dia, o PR #8 (slides e roteiro do DemoDay) é aberto e recebe um pedido de mudanças na revisão. Ele é mesclado no repositório da equipe em 13/11/2026 (`0093ae2`).
+
+### 13 a 16/11/2026 — A versão visual atual do painel (PRs #9 e #10)
+
+A versão atual do painel é trabalho da **Ingrid Soares**. Este repositório traz o `interface/app.py` desses dois PRs commit a commit, com a autoria e a data originais. Os hashes `29d6607` e `3e1f270` são do repositório da equipe.
+
+- Em 13/11, **Ingrid** redesenha o painel em três commits: cabeçalho com selos da VM na OCI e do modelo Gemini; contadores em cartões; depois de cada envio, um **resumo clínico da triagem** (tipo do documento, confiança, destino e bucket, paciente e CID, médico e CRM) acima dos blocos JSON; na aba de histórico, os cinco buckets com o papel de cada um; no formulário de auditoria, a escolha do destino em botões segmentados; cartões, campos e formulário em tons escuros; e um rodapé com a equipe. O PR #9 é mesclado no mesmo dia (`29d6607`).
+- Em 15/11, **Ingrid** corrige o resumo clínico: a confiança passa a vir do campo `score_confianca_classificacao` da resposta da API, os dados do documento passam a ser escapados antes de entrar no HTML do resumo e, na aba de histórico, o bucket da revisão humana aparece como `mediflow-auditoria-humana`. O último commit alinha o painel com a versão corrigida pelo Guilherme. O PR #10 é mesclado em 16/11 (`3e1f270`).
