@@ -20,7 +20,7 @@ Linha do tempo do MediFlow, do primeiro commit ao deploy na OCI. As datas dos co
 | #7 | Fase 2: app completo e pronto para o deploy (envio, auditoria humana pela API, chave de acesso) | André | Mesclado: `1232ec5`, em 10/11/2026 | [PR #7](https://github.com/No-Country-simulation/g10-Brasil27/pull/7) |
 | #8 | Ajustes de documentação e slides e roteiro do DemoDay | Ingrid | **Aberto**, com mudanças solicitadas na revisão (12/11/2026, UTC). **Não entra** na `main` | [PR #8](https://github.com/No-Country-simulation/g10-Brasil27/pull/8) |
 | #9 | Visual do painel Streamlit: cartões, resumo clínico da triagem e contadores (e uma aplicação React em `frontend/`, que fica só no repositório da equipe) | Ingrid | Mesclado no repositório da equipe: `29d6607`, em 13/11/2026 | [PR #9](https://github.com/No-Country-simulation/g10-Brasil27/pull/9) |
-| #10 | Score de confiança e HTML protegido no resumo clínico do painel (e um ajuste de configuração da aplicação React) | Ingrid | Mesclado no repositório da equipe: `3e1f270`, em 16/11/2026 | [PR #10](https://github.com/No-Country-simulation/g10-Brasil27/pull/10) |
+| #10 | Score de confiança e HTML protegido no resumo clínico do painel, e uma atualização do relatório técnico da Ingrid (o PR também muda a aplicação React em `frontend/`, os slides e o README do repositório da equipe, que não vêm para cá) | Ingrid | Mesclado no repositório da equipe: `3e1f270`, em 16/11/2026 | [PR #10](https://github.com/No-Country-simulation/g10-Brasil27/pull/10) |
 
 ## Linha do tempo
 
