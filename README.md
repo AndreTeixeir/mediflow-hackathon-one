@@ -49,7 +49,7 @@ O MediFlow automatiza essa triagem: lê o documento (inclusive PDF escaneado e i
 - Gera um **alerta ao plantão** para a urgência crítica (no JSON de saída).
 - **Fila de auditoria humana:** quem revisa escolhe `rotina`, `urgente` ou `rejeitado`, com nome e justificativa. A trilha guarda também o que o grafo tinha decidido.
 - **Histórico e contadores** no painel, lidos da API.
-- **Armazenamento segregado** em cinco buckets privados, um por status.
+- **Armazenamento segregado** em cinco buckets privados: um guarda a entrada de cada documento, e o resultado vai para o bucket do destino (rotina, urgentes, auditoria humana ou rejeitados).
 - **API protegida:** chave de acesso, corpo de até 15 MB, tetos diários e cache das listagens.
 - **Deploy** em Docker Compose, atrás de nginx, numa VM ARM da OCI Always Free.
 
@@ -61,7 +61,7 @@ O MediFlow automatiza essa triagem: lê o documento (inclusive PDF escaneado e i
 | Classificação com LLM | `agente/visao_multimodal.py` (Gemini com saída estruturada) e `prompts/`. A resposta traz `tipo_documento`, `especialidade` e `nivel_prioridade` ([telas](#os-3-cenários)) |
 | Extração em JSON | Contratos Pydantic em `contratos/modelos.py` (`TriagemResposta` e `DadosExtraidos`). Veja o [exemplo de saída](#exemplo-do-json-de-saída) |
 | Lógica condicional | `regras/regras_clinicas.py` (regras de roteamento) e a aresta condicional do grafo em `agente/grafo.py`. Veja o [fluxo de decisão](#fluxo-de-decisão) |
-| Object Storage com buckets segregados | Cinco buckets privados, um por status (`armazenamento/repositorio.py`, `api/triagem.py`). Telas [`oci-02`](docs/imagens/oci-02-buckets.png) e [`oci-03`](docs/imagens/oci-03-objetos-rotina.png) |
+| Object Storage com buckets segregados | Cinco buckets privados: o de entrada, que recebe cada documento, e quatro escolhidos pelo destino, que são rotina, urgentes, auditoria humana e rejeitados (`armazenamento/repositorio.py`, `api/triagem.py`). Telas [`oci-02`](docs/imagens/oci-02-buckets.png) e [`oci-03`](docs/imagens/oci-03-objetos-rotina.png) |
 | Os 3 cenários | `dados_teste/` e as telas do site no ar, na seção [Os 3 cenários](#os-3-cenários) |
 | Diagrama do fluxo | Seção [Fluxo de decisão](#fluxo-de-decisão) |
 | Arquitetura | Seção [Arquitetura](#arquitetura) |
@@ -177,7 +177,7 @@ O MediFlow roda numa VM `VM.Standard.A1.Flex` (Ampere, 1 OCPU e 5 GB, Ubuntu 24.
 
 ![A instância mediflow em execução](docs/imagens/oci-01-instancia.png)
 
-Os documentos vão para **cinco buckets privados**, um por status, e cada documento vira um objeto JSON no bucket do seu destino:
+Os documentos vão para **cinco buckets privados**: a entrada de cada um fica em `mediflow-recebidos`, e o resultado vira um objeto JSON no bucket do seu destino (`mediflow-rotina`, `mediflow-urgentes`, `mediflow-auditoria-humana` ou `mediflow-rejeitados`):
 
 ![Os cinco buckets mediflow-*, todos privados](docs/imagens/oci-02-buckets.png)
 
