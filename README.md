@@ -223,8 +223,8 @@ O passo a passo completo, com o porquê de cada cuidado, está em [`docs/deploy-
 O guia completo, com os comandos do Windows (PowerShell) e do Linux, está em [`docs/rodar-localmente.md`](docs/rodar-localmente.md). Em resumo, com o Python 3.13 e o Git:
 
 ```bash
-git clone https://github.com/No-Country-simulation/g10-Brasil27.git
-cd g10-Brasil27
+git clone https://github.com/AndreTeixeir/mediflow-hackathon-one.git
+cd mediflow-hackathon-one
 python3.13 -m venv .venv && source .venv/bin/activate     # Windows: py -3.13 -m venv .venv
 pip install -r requirements.txt
 cp .env.example .env                                      # Windows: Copy-Item .env.example .env
