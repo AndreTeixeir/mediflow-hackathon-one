@@ -22,6 +22,8 @@ Neste repositório, as pastas `api/`, `agente/`, `regras/`, `contratos/`, `armaz
 
 Ambiente de demonstração do hackathon, em HTTP, somente com dados fictícios e tetos diários (100 documentos e 300 MB por dia). Não envie documentos de pacientes reais.
 
+As telas do painel entraram no repositório em 12/11/2026 (`f59f855`) e mostram o visual anterior às mudanças dos PRs #9 e #10.
+
 ![Painel: resultado da triagem do cenário de urgência, que vai para a fila de emergência médica](docs/imagens/painel-02-envio-urgencia.png)
 
 *Envio do cenário de urgência: o painel mostra a classificação, o roteamento (com o alerta ao plantão) e os dados extraídos.*
@@ -74,6 +76,8 @@ O MediFlow automatiza essa triagem: lê o documento (inclusive PDF escaneado e i
 ## Os 3 cenários
 
 Os três cenários de `dados_teste/` foram enviados ao site no ar pelo painel, um por vez. **Os três destinos coincidem com o `resposta_esperada` de cada `exemplo.json`.** Valores como o score variam com o modelo (por exemplo, `1` no resultado real contra `0,98` no gabarito do cenário 1).
+
+As telas desta seção também são de 12/11/2026 (`f59f855`), anteriores às mudanças visuais dos PRs #9 e #10.
 
 | # | Entrada (resumo) | Destino | Bucket | Tela |
 |---|---|---|---|---|
