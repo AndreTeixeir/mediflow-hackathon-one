@@ -16,7 +16,7 @@ O MediFlow usa somente recursos da camada **Always Free** da OCI:
 | :--- | :--- | :--- |
 | **OCI Compute** | `VM.Standard.A1.Flex` (Ampere ARM64), **1 OCPU e 5 GB** no deploy real. A imagem Docker também roda em x86_64 (`VM.Standard.E2.1.Micro`) | Hospeda os containers `mediflow-api` (FastAPI + LangGraph) e `mediflow-ui` (Streamlit) e o nginx |
 | **OCI VCN** | Sub-rede pública + Internet Gateway + Security List | Controle das portas de entrada |
-| **OCI Object Storage** | **5 buckets privados**, um por status (veja a seção 3) | Persistência segregada dos documentos e das decisões |
+| **OCI Object Storage** | **5 buckets privados**, um de entrada e quatro por destino (veja a seção 3) | Persistência segregada dos documentos e das decisões |
 
 ---
 

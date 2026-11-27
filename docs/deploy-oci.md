@@ -120,7 +120,7 @@ Saída esperada: a palavra `docker` e a versão do plugin do compose.
 
 ### 3.1. Os cinco buckets
 
-Crie cinco buckets **privados**, um por status do documento, todos com o prefixo `mediflow` (é o valor de `OCI_BUCKET_PREFIXO`):
+Crie cinco buckets **privados**, um para a entrada dos documentos e quatro para os destinos, todos com o prefixo `mediflow` (é o valor de `OCI_BUCKET_PREFIXO`):
 
 | Bucket | Recebe |
 |---|---|
