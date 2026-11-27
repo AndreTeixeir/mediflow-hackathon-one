@@ -8,6 +8,8 @@ Projeto do **Hackathon ONE G10** (Oracle Next Education e Alura).
 
 Repositório oficial da equipe: [No-Country-simulation/g10-Brasil27](https://github.com/No-Country-simulation/g10-Brasil27).
 
+Neste repositório, as pastas `api/`, `agente/`, `regras/`, `contratos/`, `armazenamento/`, `prompts/` e `tests/` são iguais às do repositório da equipe, e o painel é o da equipe, trazido dos PRs #9 e #10. A aplicação em `frontend/` e os arquivos da apresentação do DemoDay estão só no repositório da equipe, e os guias [`docs/rodar-localmente.md`](docs/rodar-localmente.md), [`docs/deploy-oci.md`](docs/deploy-oci.md), [`docs/decisoes-tecnicas.md`](docs/decisoes-tecnicas.md) e [`docs/historico.md`](docs/historico.md), só aqui.
+
 [![Testes](https://github.com/No-Country-simulation/g10-Brasil27/actions/workflows/testes.yml/badge.svg)](https://github.com/No-Country-simulation/g10-Brasil27/actions/workflows/testes.yml)
 [![Python 3.13](https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white)](requirements.txt)
 [![Deploy: OCI Always Free](https://img.shields.io/badge/Deploy-OCI%20Always%20Free-C74634?logo=oracle&logoColor=white)](docs/deploy-oci.md)
