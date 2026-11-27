@@ -77,7 +77,7 @@ O MediFlow automatiza essa triagem: lê o documento (inclusive PDF escaneado e i
 
 Os três cenários de `dados_teste/` foram enviados ao site no ar pelo painel, um por vez. **Os três destinos coincidem com o `resposta_esperada` de cada `exemplo.json`.** Valores como o score variam com o modelo (por exemplo, `1` no resultado real contra `0,98` no gabarito do cenário 1).
 
-As telas desta seção também são de 12/11/2026 (`f59f855`), anteriores às mudanças visuais dos PRs #9 e #10.
+As telas desta seção também entraram no repositório em 12/11/2026 (`f59f855`) e mostram o visual anterior às mudanças dos PRs #9 e #10.
 
 | # | Entrada (resumo) | Destino | Bucket | Tela |
 |---|---|---|---|---|
