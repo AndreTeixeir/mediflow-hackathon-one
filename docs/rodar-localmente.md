@@ -226,10 +226,10 @@ A pasta `dados_teste` tem três cenários fictícios. Em cada `exemplo.json`, o 
 
 No painel:
 
-1. Aba **"📤 Envio e Triagem de Documentos"**: escolha **"Texto do documento"**, cole o texto de um dos exemplos e clique em **"🚀 Processar Triagem Automática"**. Também é possível escolher **"Enviar arquivo PDF ou imagem"** (até 10 MB).
+1. Aba **"Envio e Triagem de Documentos"**: escolha **"Texto do documento"**, cole o texto de um dos exemplos e clique em **"🚀 Processar Triagem Automática"**. Também é possível escolher **"Enviar arquivo PDF ou imagem"** (até 10 MB).
 2. Cada envio precisa de um **ID diferente**. O mesmo ID de novo dá erro 409. Use o botão **"Gerar novo ID"** a cada envio.
-3. Aba **"🔍 Fila de Auditoria Clínica (Human-in-the-Loop)"**: o documento retido aparece aqui. Escolha o destino (**Rotina**, **Urgente** ou **Rejeitar**), escreva o seu nome e a justificativa (de 5 a 500 caracteres) e clique em **"✅ Registrar decisão"**.
-4. Aba **"📊 Histórico & Buckets OCI"**: mostra os documentos processados. Apesar do nome da aba, no modo `local` tudo fica gravado na pasta **`armazenamento_local/`** do projeto, que também não vai para o Git.
+3. Aba **"Fila de Auditoria Clínica (Human-in-the-Loop)"**: o documento retido aparece aqui. Escolha o destino (**Rotina**, **Urgente** ou **Rejeitar**), escreva o seu nome e a justificativa (de 5 a 500 caracteres) e clique em **"✅ Registrar decisão"**.
+4. Aba **"Histórico & Buckets OCI"**: mostra os documentos processados. Apesar do nome da aba, no modo `local` tudo fica gravado na pasta **`armazenamento_local/`** do projeto, que também não vai para o Git.
 
 **Use somente dados fictícios.** Nunca envie documentos de pacientes reais.
 

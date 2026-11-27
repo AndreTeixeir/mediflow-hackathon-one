@@ -99,7 +99,7 @@ Os buckets dos cenários 1 e 2 estão no [histórico](docs/imagens/painel-06-his
 
 ## Exemplo do JSON de saída
 
-Resposta real da triagem do cenário de urgência (`DOC-PORTFOLIO-URGENCIA-001`), como o painel a mostra. O paciente é fictício. A API devolve ainda `status`, `documento_id` e `armazenamento_oci` (o bucket e o caminho do objeto), que o painel não exibe.
+Resposta real da triagem do cenário de urgência (`DOC-PORTFOLIO-URGENCIA-001`), como o painel a mostra. O paciente é fictício. A API devolve ainda `status`, `documento_id` e `armazenamento_oci` (o bucket e o caminho do objeto). Desses, o painel mostra só o `documento_id` e o bucket, no resumo clínico que aparece acima do JSON.
 
 ```json
 {
